@@ -4,7 +4,7 @@ import { Topbar } from "@/components/layout/Topbar";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-slate-100">
+    <div className="flex min-h-screen">
       <Sidebar />
       <div className="min-w-0 flex-1">
         <Topbar />

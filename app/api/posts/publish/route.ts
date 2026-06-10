@@ -10,6 +10,8 @@ export async function POST(request: Request) {
     const user = await requireUser();
     const { id } = (await request.json()) as { id?: string };
     if (!id) return jsonError("Post id is required.", 422);
+    const existing = await db.post.findFirst({ where: { id, socialAccount: { userId: user.id } } });
+    if (!existing) return jsonError("Post not found.", 404);
     const post = await db.post.update({
       where: { id },
       data: {

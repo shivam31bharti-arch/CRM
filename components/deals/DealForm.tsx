@@ -1,20 +1,28 @@
 // Slide-over-ready deal form used by the pipeline page.
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 
 export function DealForm({ onCreated }: { onCreated?: () => void }) {
+  const [message, setMessage] = useState("");
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setMessage("");
     const form = event.currentTarget;
-    await fetch("/api/deals", {
+    const response = await fetch("/api/deals", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(Object.fromEntries(new FormData(form)))
     });
+    if (!response.ok) {
+      setMessage("Deal could not be saved.");
+      return;
+    }
     form.reset();
+    setMessage("Deal created.");
     onCreated?.();
   }
   return (
@@ -29,6 +37,7 @@ export function DealForm({ onCreated }: { onCreated?: () => void }) {
         <option value="NEGOTIATION">Negotiation</option>
       </Select>
       <Button type="submit">Create deal</Button>
+      {message ? <p className="text-sm font-medium text-slate-600 md:col-span-5">{message}</p> : null}
     </form>
   );
 }

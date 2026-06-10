@@ -9,9 +9,15 @@ export default async function middleware(req: NextRequest) {
   const isProtectedPage = !isAuthRoute && !isApiAuthRoute && !req.nextUrl.pathname.startsWith("/_next");
   const token = await getToken({
     req,
-    secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "local-development-auth-secret-change-me"
+    secret:
+      process.env.AUTH_SECRET ??
+      process.env.NEXTAUTH_SECRET ??
+      (process.env.NODE_ENV === "development" ? "local-development-auth-secret-change-me" : undefined)
   });
   if (isProtectedPage && !token) {
+    if (req.nextUrl.pathname.startsWith("/api")) {
+      return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+    }
     const url = new URL("/login", req.nextUrl.origin);
     url.searchParams.set("callbackUrl", req.nextUrl.pathname);
     return NextResponse.redirect(url);

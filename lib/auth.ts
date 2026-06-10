@@ -20,7 +20,10 @@ export { hashPassword, verifyPassword };
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET ?? "local-development-auth-secret-change-me",
+  secret:
+    process.env.AUTH_SECRET ??
+    process.env.NEXTAUTH_SECRET ??
+    (process.env.NODE_ENV === "development" ? "local-development-auth-secret-change-me" : undefined),
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [

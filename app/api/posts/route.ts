@@ -7,10 +7,11 @@ import { jsonError } from "@/lib/utils";
 
 export async function GET(request: Request) {
   try {
-    await requireUser();
+    const user = await requireUser();
     const params = new URL(request.url).searchParams;
     const items = await db.post.findMany({
       where: {
+        socialAccount: { userId: user.id },
         platform: params.get("platform") ? (params.get("platform") as never) : undefined,
         status: params.get("status") ? (params.get("status") as never) : undefined
       },
@@ -28,6 +29,10 @@ export async function POST(request: Request) {
     const user = await requireUser();
     const parsed = postSchema.safeParse(await request.json());
     if (!parsed.success) return jsonError(parsed.error.issues[0]?.message ?? "Invalid input.", 422);
+    const account = await db.socialAccount.findFirst({
+      where: { id: parsed.data.socialAccountId, userId: user.id, platform: parsed.data.platform }
+    });
+    if (!account) return jsonError("Social account is not available for this user and platform.", 403);
     const post = await db.post.create({
       data: {
         ...parsed.data,

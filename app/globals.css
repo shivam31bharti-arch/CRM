@@ -4,7 +4,7 @@
 @tailwind utilities;
 
 :root {
-  --background: 210 40% 98%;
+  --background: 210 32% 97%;
   --foreground: 222 47% 11%;
   --card: 0 0% 100%;
   --card-foreground: 222 47% 11%;
@@ -29,7 +29,9 @@
 
 body {
   margin: 0;
-  background: hsl(var(--background));
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.08), transparent 30rem),
+    hsl(var(--background));
   color: hsl(var(--foreground));
 }
 

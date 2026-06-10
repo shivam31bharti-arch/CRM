@@ -11,13 +11,13 @@ import { NotificationBell } from "@/components/layout/NotificationBell";
 export function Topbar() {
   const { data } = useSession();
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-white px-4">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-white/90 px-4 backdrop-blur">
       <Button variant="ghost" className="px-2 md:hidden" aria-label="Open navigation">
         <Menu className="h-5 w-5" aria-hidden="true" />
       </Button>
       <div className="relative max-w-md flex-1">
         <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden="true" />
-        <Input className="pl-9" placeholder="Search contacts, deals, posts..." aria-label="Global search" />
+        <Input className="border-slate-200 bg-slate-50 pl-9" placeholder="Search contacts, deals, posts..." aria-label="Global search" />
       </div>
       <NotificationBell />
       <div className="hidden items-center gap-2 sm:flex">

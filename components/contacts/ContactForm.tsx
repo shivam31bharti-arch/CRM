@@ -1,21 +1,30 @@
 // Contact create/edit form with client-side validation affordances.
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 
 export function ContactForm({ onCreated }: { onCreated?: () => void }) {
+  const [message, setMessage] = useState("");
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setMessage("");
     const form = event.currentTarget;
     const formData = new FormData(form);
-    await fetch("/api/contacts", {
+    const response = await fetch("/api/contacts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(Object.fromEntries(formData))
     });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ error: "Contact could not be saved." }));
+      setMessage(body.error ?? "Contact could not be saved.");
+      return;
+    }
     form.reset();
+    setMessage("Contact saved.");
     onCreated?.();
   }
 
@@ -48,6 +57,7 @@ export function ContactForm({ onCreated }: { onCreated?: () => void }) {
       <div className="flex items-end">
         <Button type="submit">Save contact</Button>
       </div>
+      {message ? <p className="text-sm font-medium text-slate-600 md:col-span-2">{message}</p> : null}
     </form>
   );
 }
