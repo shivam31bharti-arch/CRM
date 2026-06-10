@@ -1,0 +1,11 @@
+# Keep Docker build context small and deterministic.
+node_modules
+.next
+.git
+coverage
+playwright-report
+test-results
+*.log
+tsconfig.tsbuildinfo
+.env
+.env.local
