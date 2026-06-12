@@ -1,13 +1,22 @@
 // Analytics overview endpoint with aggregate KPI cards.
 import { subDays } from "date-fns";
+import { z } from "zod";
 import { authErrorResponse, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { jsonError } from "@/lib/utils";
+
+// [M-1] Validate the from date before passing to Prisma — prevents Invalid Date crashes.
+const dateParam = z.string().datetime({ offset: true }).optional();
 
 export async function GET(request: Request) {
   try {
     await requireUser();
     const params = new URL(request.url).searchParams;
-    const from = params.get("from") ? new Date(String(params.get("from"))) : subDays(new Date(), 30);
+
+    const fromParsed = dateParam.safeParse(params.get("from") ?? undefined);
+    if (!fromParsed.success) return jsonError("Invalid 'from' date. Use ISO 8601 format.", 400);
+    const from = fromParsed.data ? new Date(fromParsed.data) : subDays(new Date(), 30);
+
     const [totalPosts, analytics, followers] = await Promise.all([
       db.post.count({ where: { createdAt: { gte: from } } }),
       db.postAnalytic.aggregate({
@@ -16,6 +25,7 @@ export async function GET(request: Request) {
       }),
       db.platformAnalytic.aggregate({ where: { recordedAt: { gte: from } }, _sum: { followers: true } })
     ]);
+
     const engagementTotal = (analytics._sum.likes ?? 0) + (analytics._sum.comments ?? 0) + (analytics._sum.shares ?? 0);
     const impressions = analytics._sum.impressions ?? 1;
     return Response.json({
@@ -28,3 +38,5 @@ export async function GET(request: Request) {
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";

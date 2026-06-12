@@ -31,3 +31,5 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";

@@ -19,3 +19,5 @@ export async function GET(_: Request, { params }: { params: { platform: string }
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";

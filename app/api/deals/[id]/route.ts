@@ -26,12 +26,19 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    await requireUser();
+    const user = await requireUser();
     const parsed = dealSchema.partial().safeParse(await request.json());
     if (!parsed.success) return jsonError(parsed.error.issues[0]?.message ?? "Invalid input.", 422);
     if (parsed.data.stage === DealStage.CLOSED_LOST && !parsed.data.lostReason) {
       return jsonError("Lost reason is required when closing a deal as lost.", 422);
     }
+
+    // [C-1] MEMBER-level users may only update deals assigned to them.
+    if (user.role === "MEMBER") {
+      const owned = await db.deal.findFirst({ where: { id: params.id, assignedToId: user.id } });
+      if (!owned) return jsonError("Deal not found or access denied.", 403);
+    }
+
     const deal = await db.deal.update({
       where: { id: params.id },
       data: {
@@ -56,3 +63,5 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";

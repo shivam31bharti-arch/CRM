@@ -29,6 +29,16 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const user = await requireUser();
     const parsed = contactSchema.partial().safeParse(await request.json());
     if (!parsed.success) return jsonError(parsed.error.issues[0]?.message ?? "Invalid input.", 422);
+
+    // [C-1] MEMBER-level users may only update contacts they created or are assigned to.
+    //        ADMIN and MANAGER can update any contact.
+    if (user.role === "MEMBER") {
+      const owned = await db.contact.findFirst({
+        where: { id: params.id, OR: [{ createdById: user.id }, { assignedToId: user.id }] }
+      });
+      if (!owned) return jsonError("Contact not found or access denied.", 403);
+    }
+
     const { tags, ...data } = parsed.data;
     const contact = await db.contact.update({
       where: { id: params.id },
@@ -61,3 +71,5 @@ export async function DELETE(_: Request, { params }: { params: { id: string } })
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";

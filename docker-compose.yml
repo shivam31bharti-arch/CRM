@@ -7,7 +7,8 @@ services:
       POSTGRES_PASSWORD: crm
       POSTGRES_DB: crm
     ports:
-      - "5432:5432"
+      # [M-7] Bind to loopback only — prevents exposing DB port to the public internet.
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -19,7 +20,8 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      # [M-7] Bind Redis to loopback only as well.
+      - "127.0.0.1:6379:6379"
 
   app:
     build: .
@@ -31,8 +33,14 @@ services:
     environment:
       DATABASE_URL: postgresql://crm:crm@postgres:5432/crm?schema=public
       NEXTAUTH_URL: http://localhost:3000
-      NEXTAUTH_SECRET: local-development-secret-change-me
-      AUTH_SECRET: local-development-secret-change-me
+      # IMPORTANT: Override these in production with real secrets.
+      # Generate with: openssl rand -base64 32
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-local-development-secret-change-me-in-production}
+      AUTH_SECRET: ${AUTH_SECRET:-local-development-secret-change-me-in-production}
+      # Generate with: openssl rand -hex 32
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      # Generate with: openssl rand -base64 32
+      API_KEY_SECRET: ${API_KEY_SECRET:-}
       REDIS_URL: redis://redis:6379
     ports:
       - "3000:3000"

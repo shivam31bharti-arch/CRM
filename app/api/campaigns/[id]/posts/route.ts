@@ -27,3 +27,5 @@ export async function DELETE(request: Request) {
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";

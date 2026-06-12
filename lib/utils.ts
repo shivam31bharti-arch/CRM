@@ -26,7 +26,10 @@ export function jsonError(message: string, status = 400) {
 
 export function csvEscape(value: unknown) {
   const text = String(value ?? "");
-  return `"${text.replaceAll('"', '""')}"`;
+  // [M-2] Prevent CSV/formula injection: spreadsheet apps execute cells starting
+  // with =, +, -, @, TAB, or CR as formulas. Prefix with a single quote to disarm.
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return `"${safe.replaceAll('"', '""')}"`;
 }
 
 export function toCsv(rows: Array<Record<string, unknown>>) {

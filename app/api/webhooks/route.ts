@@ -25,3 +25,5 @@ export async function POST(request: Request) {
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";

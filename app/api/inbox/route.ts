@@ -38,3 +38,5 @@ export async function PATCH() {
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";

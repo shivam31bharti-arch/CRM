@@ -17,3 +17,5 @@ export async function GET() {
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";

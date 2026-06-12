@@ -5,9 +5,8 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 
 export function IntegrationCard({ platform, account, onChanged }: { platform: string; account?: { accountName: string; followerCount?: number | null; isActive: boolean } | null; onChanged?: () => void }) {
-  async function connect() {
-    await fetch(`/api/social-accounts/connect/${platform}`);
-    onChanged?.();
+  function connect() {
+    window.location.href = `/api/social-accounts/connect?platform=${encodeURIComponent(platform)}`;
   }
   async function disconnect() {
     await fetch("/api/settings/integrations", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ platform, isActive: false }) });

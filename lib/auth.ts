@@ -6,6 +6,15 @@ import { db } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { loginSchema } from "@/lib/validations/auth";
 
+// [C-4] Fail fast at module load — never silently fall back to a hardcoded secret.
+const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
+if (!authSecret) {
+  throw new Error(
+    "AUTH_SECRET environment variable is required. " +
+      "Generate one with: openssl rand -base64 32"
+  );
+}
+
 function publicUser(user: User) {
   return {
     id: user.id,
@@ -20,10 +29,7 @@ export { hashPassword, verifyPassword };
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
-  secret:
-    process.env.AUTH_SECRET ??
-    process.env.NEXTAUTH_SECRET ??
-    (process.env.NODE_ENV === "development" ? "local-development-auth-secret-change-me" : undefined),
+  secret: authSecret,
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [
@@ -71,19 +77,22 @@ export class ApiAuthError extends Error {
   }
 }
 
+// [H-3] Use id from JWT — avoids an extra DB round-trip on every request.
 export async function requireUser(roles?: Role[]) {
   const session = await auth();
-  const email = session?.user?.email;
-  if (!email) throw new ApiAuthError("Authentication required.", 401);
-  const user = await db.user.findUnique({ where: { email } });
+  const id = session?.user?.id;
+  if (!id) throw new ApiAuthError("Authentication required.", 401);
+  const user = await db.user.findUnique({ where: { id } });
   if (!user) throw new ApiAuthError("Authentication required.", 401);
   if (roles && !roles.includes(user.role)) throw new ApiAuthError("Insufficient permissions.", 403);
   return user;
 }
 
+// [H-6] Catch ALL errors — log server-side, never expose stack traces to clients.
 export function authErrorResponse(error: unknown) {
   if (error instanceof ApiAuthError) {
     return Response.json({ error: error.message }, { status: error.status });
   }
-  throw error;
+  console.error("[API Error]", error);
+  return Response.json({ error: "Internal server error." }, { status: 500 });
 }

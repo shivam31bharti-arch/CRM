@@ -30,3 +30,5 @@ export async function GET(request: Request) {
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";

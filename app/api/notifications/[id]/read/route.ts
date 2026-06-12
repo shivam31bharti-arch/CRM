@@ -11,3 +11,5 @@ export async function PATCH(_: Request, { params }: { params: { id: string } }) 
     return authErrorResponse(error);
   }
 }
+
+export const dynamic = "force-dynamic";
