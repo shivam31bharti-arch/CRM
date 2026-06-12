@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as { name?: string };
     const name = body.name?.trim() || "Default API key";
     if (name.length > 80) return jsonError("API key name must be 80 characters or fewer.", 422);
-    const rawKey = `sk_live_${randomBytes(24).toString("hex")}`;
+    const rawKey = `crm_live_${randomBytes(24).toString("hex")}`;
     const keyHash = hashKey(rawKey);
     const item = await db.apiKey.create({
       data: {
