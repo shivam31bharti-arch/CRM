@@ -4,12 +4,13 @@ import { db } from "@/lib/db";
 import { linkContactSchema } from "@/lib/validations/inbox";
 import { jsonError } from "@/lib/utils";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     await requireUser();
     const parsed = linkContactSchema.safeParse(await request.json());
     if (!parsed.success) return jsonError("Contact id is required.", 422);
-    const item = await db.inboxItem.update({ where: { id: params.id }, data: { contactId: parsed.data.contactId } });
+    const item = await db.inboxItem.update({ where: { id }, data: { contactId: parsed.data.contactId } });
     return Response.json(item);
   } catch (error) {
     return authErrorResponse(error);

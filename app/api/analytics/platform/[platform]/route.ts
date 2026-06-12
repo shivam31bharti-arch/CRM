@@ -4,10 +4,11 @@ import { authErrorResponse, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { jsonError } from "@/lib/utils";
 
-export async function GET(_: Request, { params }: { params: { platform: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ platform: string }> }) {
   try {
+    const { platform: platformParam } = await params;
     await requireUser();
-    const platform = params.platform.toUpperCase() as Platform;
+    const platform = platformParam.toUpperCase() as Platform;
     if (!Object.values(Platform).includes(platform)) return jsonError("Unsupported platform.", 404);
     const items = await db.platformAnalytic.findMany({
       where: { socialAccount: { platform } },

@@ -6,8 +6,9 @@ import { createNotification } from "@/lib/notifications";
 import { stageChangeSchema } from "@/lib/validations/deals";
 import { jsonError } from "@/lib/utils";
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const user = await requireUser();
     const parsed = stageChangeSchema.safeParse(await request.json());
     if (!parsed.success) return jsonError(parsed.error.issues[0]?.message ?? "Invalid input.", 422);
@@ -15,7 +16,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return jsonError("Lost reason is required when marking a deal as lost.", 422);
     }
     const deal = await db.deal.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         stage: parsed.data.stage,
         wonAt: parsed.data.stage === DealStage.CLOSED_WON ? new Date() : null,

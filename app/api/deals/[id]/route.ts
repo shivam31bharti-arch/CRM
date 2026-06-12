@@ -5,11 +5,12 @@ import { db } from "@/lib/db";
 import { dealSchema } from "@/lib/validations/deals";
 import { jsonError } from "@/lib/utils";
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     await requireUser();
     const deal = await db.deal.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         contact: true,
         assignedTo: { select: { id: true, name: true, avatarUrl: true } },
@@ -24,8 +25,9 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const user = await requireUser();
     const parsed = dealSchema.partial().safeParse(await request.json());
     if (!parsed.success) return jsonError(parsed.error.issues[0]?.message ?? "Invalid input.", 422);
@@ -35,12 +37,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     // [C-1] MEMBER-level users may only update deals assigned to them.
     if (user.role === "MEMBER") {
-      const owned = await db.deal.findFirst({ where: { id: params.id, assignedToId: user.id } });
+      const owned = await db.deal.findFirst({ where: { id, assignedToId: user.id } });
       if (!owned) return jsonError("Deal not found or access denied.", 403);
     }
 
     const deal = await db.deal.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...parsed.data,
         closeDate: parsed.data.closeDate ? new Date(parsed.data.closeDate) : undefined,
@@ -54,10 +56,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     await requireUser(["ADMIN", "MANAGER"]);
-    await db.deal.delete({ where: { id: params.id } });
+    await db.deal.delete({ where: { id } });
     return Response.json({ ok: true });
   } catch (error) {
     return authErrorResponse(error);

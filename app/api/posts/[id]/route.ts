@@ -5,11 +5,12 @@ import { db } from "@/lib/db";
 import { postPatchSchema } from "@/lib/validations/posts";
 import { jsonError } from "@/lib/utils";
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const user = await requireUser();
     const post = await db.post.findFirst({
-      where: { id: params.id, socialAccount: { userId: user.id } },
+      where: { id, socialAccount: { userId: user.id } },
       include: { socialAccount: true, campaign: true }
     });
     if (!post) return jsonError("Post not found.", 404);
@@ -19,14 +20,15 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const user = await requireUser();
     const body = await request.json();
-    const existing = await db.post.findFirst({ where: { id: params.id, socialAccount: { userId: user.id } } });
+    const existing = await db.post.findFirst({ where: { id, socialAccount: { userId: user.id } } });
     if (!existing) return jsonError("Post not found.", 404);
     if (body.status === PostStatus.CANCELLED) {
-      const cancelled = await db.post.update({ where: { id: params.id }, data: { status: PostStatus.CANCELLED } });
+      const cancelled = await db.post.update({ where: { id }, data: { status: PostStatus.CANCELLED } });
       return Response.json(cancelled);
     }
     const parsed = postPatchSchema.safeParse(body);
@@ -42,7 +44,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       if (!account) return jsonError("Social account is not available for this user and platform.", 403);
     }
     const post = await db.post.update({
-      where: { id: params.id },
+      where: { id },
       data: { ...parsed.data, scheduledAt: parsed.data.scheduledAt ? new Date(parsed.data.scheduledAt) : undefined }
     });
     return Response.json(post);
@@ -51,12 +53,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const user = await requireUser();
-    const existing = await db.post.findFirst({ where: { id: params.id, socialAccount: { userId: user.id } } });
+    const existing = await db.post.findFirst({ where: { id, socialAccount: { userId: user.id } } });
     if (!existing) return jsonError("Post not found.", 404);
-    await db.post.delete({ where: { id: params.id } });
+    await db.post.delete({ where: { id } });
     return Response.json({ ok: true });
   } catch (error) {
     return authErrorResponse(error);

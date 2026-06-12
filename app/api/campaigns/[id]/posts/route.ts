@@ -4,12 +4,13 @@ import { db } from "@/lib/db";
 import { campaignLinkSchema } from "@/lib/validations/campaigns";
 import { jsonError } from "@/lib/utils";
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     await requireUser();
     const parsed = campaignLinkSchema.safeParse(await request.json());
     if (!parsed.success) return jsonError("Post id is required.", 422);
-    const post = await db.post.update({ where: { id: parsed.data.id }, data: { campaignId: params.id } });
+    const post = await db.post.update({ where: { id: parsed.data.id }, data: { campaignId: id } });
     return Response.json(post);
   } catch (error) {
     return authErrorResponse(error);

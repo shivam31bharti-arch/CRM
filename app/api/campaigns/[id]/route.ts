@@ -4,11 +4,12 @@ import { db } from "@/lib/db";
 import { campaignSchema } from "@/lib/validations/campaigns";
 import { jsonError } from "@/lib/utils";
 
-export async function GET(_: Request, { params }: { params: { id: string } }) {
+export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     await requireUser();
     const campaign = await db.campaign.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         posts: { include: { analytics: true } },
         contacts: { include: { contact: true } },
@@ -22,13 +23,14 @@ export async function GET(_: Request, { params }: { params: { id: string } }) {
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     await requireUser();
     const parsed = campaignSchema.partial().safeParse(await request.json());
     if (!parsed.success) return jsonError(parsed.error.issues[0]?.message ?? "Invalid input.", 422);
     const campaign = await db.campaign.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...parsed.data,
         startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : undefined,
@@ -41,10 +43,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     await requireUser(["ADMIN", "MANAGER"]);
-    await db.campaign.delete({ where: { id: params.id } });
+    await db.campaign.delete({ where: { id } });
     return Response.json({ ok: true });
   } catch (error) {
     return authErrorResponse(error);

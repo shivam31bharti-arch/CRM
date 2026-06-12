@@ -8,9 +8,10 @@ import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export default async function ContactDetailPage({ params }: { params: { id: string } }) {
+export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const contact = await db.contact.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { tags: true, deals: true, activities: { orderBy: { createdAt: "desc" }, include: { user: { select: { name: true } } } } }
   });
   if (!contact) return <PageHeader title="Contact not found" />;

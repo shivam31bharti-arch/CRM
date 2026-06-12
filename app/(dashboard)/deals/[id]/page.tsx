@@ -5,9 +5,10 @@ import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export default async function DealDetailPage({ params }: { params: { id: string } }) {
+export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const deal = await db.deal.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: { contact: true, activities: { orderBy: { createdAt: "desc" }, include: { user: { select: { name: true } } } } }
   });
   if (!deal) return <PageHeader title="Deal not found" />;
