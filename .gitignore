@@ -9,9 +9,11 @@ public/docker-*.png
 
 # Environment files.
 .env
-.env.local
+.env*.local
 
 # Logs and OS files.
 *.log
 Thumbs.db
 .DS_Store
+
+.vercel
