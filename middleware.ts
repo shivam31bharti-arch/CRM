@@ -4,7 +4,10 @@ import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 export default async function middleware(req: NextRequest) {
-  const isAuthRoute = req.nextUrl.pathname.startsWith("/login") || req.nextUrl.pathname.startsWith("/register");
+  const isAuthRoute =
+    req.nextUrl.pathname.startsWith("/login") ||
+    req.nextUrl.pathname.startsWith("/register") ||
+    req.nextUrl.pathname.startsWith("/forgot-password");
   const isApiAuthRoute = req.nextUrl.pathname.startsWith("/api/auth");
   // Cron endpoint uses its own CRON_SECRET bearer token; skip JWT check.
   const isCronRoute = req.nextUrl.pathname.startsWith("/api/cron");

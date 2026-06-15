@@ -7,8 +7,8 @@ import { Providers } from "@/components/shared/Providers";
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Social CRM",
-  description: "Social media manager CRM for sales and marketing teams."
+  title: "Kai & Co. CRM",
+  description: "Internal client relationship workspace for Kai & Co."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

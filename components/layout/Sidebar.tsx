@@ -5,16 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { navItems } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/shared/BrandMark";
 
 export function Sidebar() {
   const pathname = usePathname();
   return (
     <aside className="hidden w-64 shrink-0 border-r bg-slate-950 text-white md:block">
       <div className="flex h-16 items-center border-b border-white/10 px-5">
-        <div>
-          <p className="text-lg font-bold">Social CRM</p>
-          <p className="text-xs text-slate-400">Manager console</p>
-        </div>
+        <BrandMark className="[&_p:last-child]:text-slate-400" />
       </div>
       <nav className="space-y-1 p-3" aria-label="Primary">
         {navItems.map((item) => {

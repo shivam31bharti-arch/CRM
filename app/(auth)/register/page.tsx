@@ -8,6 +8,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
+import { BrandMark } from "@/components/shared/BrandMark";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -36,14 +37,16 @@ export default function RegisterPage() {
       return;
     }
     await signIn("credentials", { email: payload.email, password: payload.password, redirect: false });
-    router.push("/");
+    router.replace("/");
+    router.refresh();
   }
 
   return (
-    <Card className="p-6">
+    <Card className="p-6 shadow-panel">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold">Create your workspace</h1>
-        <p className="mt-1 text-sm text-slate-500">Start with one account, then invite the rest of your team.</p>
+        <BrandMark className="mb-6" />
+        <h1 className="text-2xl font-bold">Create your account</h1>
+        <p className="mt-1 text-sm text-slate-500">Join the Kai &amp; Co. internal workspace for client and pipeline operations.</p>
       </div>
       <form className="space-y-4" onSubmit={onSubmit}>
         <label className="block text-sm font-medium">
@@ -65,7 +68,7 @@ export default function RegisterPage() {
       </form>
       <p className="mt-5 text-center text-sm text-slate-500">
         Already registered?{" "}
-        <Link className="font-medium text-blue-700" href="/login">
+        <Link className="font-medium text-primary hover:text-red-700" href="/login">
           Sign in
         </Link>
       </p>
