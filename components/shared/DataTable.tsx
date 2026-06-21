@@ -18,12 +18,15 @@ export function DataTable<T extends { id: string }>({
   onSort?: (key: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border bg-white">
+    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-card">
       <table className="min-w-full divide-y divide-slate-200 text-sm">
-        <thead className="bg-slate-50">
+        <thead className="bg-slate-50/80">
           <tr>
             {columns.map((column) => (
-              <th key={String(column.key)} className="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-600">
+              <th
+                key={String(column.key)}
+                className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500"
+              >
                 <button
                   type="button"
                   className="focus-ring inline-flex items-center gap-1 rounded"
@@ -31,7 +34,9 @@ export function DataTable<T extends { id: string }>({
                   aria-label={column.sortable ? `Sort by ${column.header}` : undefined}
                 >
                   {column.header}
-                  {column.sortable ? <ArrowUpDown className="h-3.5 w-3.5" aria-hidden="true" /> : null}
+                  {column.sortable ? (
+                    <ArrowUpDown className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : null}
                 </button>
               </th>
             ))}
@@ -39,7 +44,7 @@ export function DataTable<T extends { id: string }>({
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-slate-50">
+            <tr key={row.id} className="transition hover:bg-slate-50/80">
               {columns.map((column) => (
                 <td key={String(column.key)} className="whitespace-nowrap px-4 py-3 text-slate-700">
                   {column.render ? column.render(row) : String(row[column.key as keyof T] ?? "")}

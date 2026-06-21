@@ -5,7 +5,11 @@ import { PageHeader } from "@/components/layout/PageHeader";
 export default function InboxPage() {
   return (
     <>
-      <PageHeader title="Inbox" description="Reply to mentions, comments, DMs, and social replies from one queue." />
+      <PageHeader
+        eyebrow="Engagement"
+        title="Relationship Inbox"
+        description="Turn comments, mentions, and direct messages into timely responses and CRM relationships."
+      />
       <InboxList />
     </>
   );

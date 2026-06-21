@@ -6,8 +6,14 @@ import { PageHeader } from "@/components/layout/PageHeader";
 export default function CampaignsPage() {
   return (
     <>
-      <PageHeader title="Campaigns" description="Group social posts, CRM contacts, and deals into measurable initiatives." />
-      <div className="mb-4"><CampaignForm /></div>
+      <PageHeader
+        eyebrow="Growth"
+        title="Campaign Workspace"
+        description="Connect content, audiences, and pipeline so every initiative has a measurable business outcome."
+      />
+      <div className="mb-4">
+        <CampaignForm />
+      </div>
       <CampaignList />
     </>
   );

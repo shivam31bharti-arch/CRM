@@ -7,13 +7,17 @@ import { PageHeader } from "@/components/layout/PageHeader";
 export default function ContactsPage() {
   return (
     <>
-      <PageHeader title="Contacts" description="Manage leads, customers, tags, assignments, and activity history." />
-      <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+      <PageHeader
+        eyebrow="CRM"
+        title="Customer Hub"
+        description="Build a clean relationship map, assign ownership, and move the right people toward revenue."
+      />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <ContactTable />
-        <div className="space-y-4">
+        <aside className="space-y-4 xl:sticky xl:top-20 xl:self-start">
           <ContactForm />
           <ImportModal />
-        </div>
+        </aside>
       </div>
     </>
   );

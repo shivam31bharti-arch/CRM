@@ -17,11 +17,19 @@ export function ContactFilters({
   onStatus: (value: string) => void;
 }) {
   return (
-    <div className="mb-4 grid gap-3 md:grid-cols-[1fr_220px]">
+    <div className="grid gap-2 sm:grid-cols-[minmax(220px,1fr)_180px]">
       <label className="relative block">
         <span className="sr-only">Search contacts</span>
-        <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" aria-hidden="true" />
-        <Input value={search} onChange={(event) => onSearch(event.target.value)} className="pl-9" placeholder="Search name, email, company" />
+        <Search
+          className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400"
+          aria-hidden="true"
+        />
+        <Input
+          value={search}
+          onChange={(event) => onSearch(event.target.value)}
+          className="pl-9"
+          placeholder="Search name, email, company"
+        />
       </label>
       <label>
         <span className="sr-only">Status</span>

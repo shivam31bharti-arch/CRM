@@ -6,6 +6,7 @@ import {
   KanbanSquare,
   LayoutDashboard,
   Megaphone,
+  Sparkles,
   Settings,
   UserRoundCog,
   Users
@@ -13,6 +14,7 @@ import {
 
 export const navItems = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Command Center", href: "/command-center", icon: Sparkles },
   { label: "Contacts", href: "/contacts", icon: Users },
   { label: "Deals", href: "/deals", icon: KanbanSquare },
   { label: "Scheduler", href: "/scheduler", icon: CalendarDays },
@@ -23,7 +25,14 @@ export const navItems = [
   { label: "Settings", href: "/settings", icon: Settings }
 ];
 
-export const dealStages = ["LEAD", "QUALIFIED", "PROPOSAL", "NEGOTIATION", "CLOSED_WON", "CLOSED_LOST"] as const;
+export const dealStages = [
+  "LEAD",
+  "QUALIFIED",
+  "PROPOSAL",
+  "NEGOTIATION",
+  "CLOSED_WON",
+  "CLOSED_LOST"
+] as const;
 
 export const platforms = ["TWITTER", "LINKEDIN", "INSTAGRAM", "FACEBOOK"] as const;
 
