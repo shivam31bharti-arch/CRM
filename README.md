@@ -1,4 +1,4 @@
-# Kai & Co. CRM
+CRM
 
 Internal CRM backbone for contact management, opportunity tracking, campaigns, social publishing, analytics, and team operations.
 
