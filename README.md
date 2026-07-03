@@ -1,6 +1,6 @@
 # Kai & Co. Internal CRM
 
-![Dashboard Snapshot](./public/dashboard-screenshot.png)
+![Dashboard Snapshot](./public/screenshots/dashboard.png)
 
 A modern, full-stack Internal CRM backbone built for contact management, opportunity tracking, marketing campaigns, automated social publishing, analytics, and streamlined team operations.
 
