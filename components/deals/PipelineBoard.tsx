@@ -7,6 +7,7 @@ import { Search } from "lucide-react";
 import type { DealRow } from "@/components/deals/DealCard";
 import { PipelineAnalytics } from "@/components/deals/PipelineAnalytics";
 import { StageColumn } from "@/components/deals/StageColumn";
+import { apiJson } from "@/lib/client-api";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { Input } from "@/components/ui/Input";
 import { dealStages } from "@/lib/constants";
@@ -20,7 +21,7 @@ export function PipelineBoard() {
   const client = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ["deals"],
-    queryFn: async () => (await fetch("/api/deals")).json()
+    queryFn: () => apiJson<{ items: DealRow[] }>("/api/deals")
   });
   const deals: DealRow[] = data?.items ?? EMPTY_DEALS;
   const visibleDeals = deals.filter((deal) =>

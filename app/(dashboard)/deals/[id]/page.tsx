@@ -1,6 +1,7 @@
 import { DealDetail } from "@/components/deals/DealDetail";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { db } from "@/lib/db";
+import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
       activities: { orderBy: { createdAt: "desc" }, include: { user: { select: { name: true } } } }
     }
   });
-  if (!deal) return <PageHeader title="Deal not found" />;
+  if (!deal) notFound();
   return (
     <>
       <PageHeader

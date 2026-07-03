@@ -2,6 +2,7 @@
 import { authErrorResponse, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { jsonError } from "@/lib/utils";
+import { safeSocialAccountSelect } from "@/lib/selects";
 
 // [H-1] GET is now read-only and idempotent. Ownership checked via socialAccount.
 export async function GET(_: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -10,7 +11,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
     const user = await requireUser();
     const item = await db.inboxItem.findFirst({
       where: { id, socialAccount: { userId: user.id } },
-      include: { contact: true, socialAccount: true }
+      include: { contact: true, socialAccount: { select: safeSocialAccountSelect } }
     });
     if (!item) return jsonError("Inbox item not found.", 404);
     return Response.json(item);

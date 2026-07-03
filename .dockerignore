@@ -7,5 +7,5 @@ playwright-report
 test-results
 *.log
 tsconfig.tsbuildinfo
-.env
-.env.local
+.env*
+!.env.example

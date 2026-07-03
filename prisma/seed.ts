@@ -1,11 +1,34 @@
 // Seed script for local demo data across CRM and social modules.
-import { PrismaClient, Role, ContactStatus, DealStage, Platform, PostStatus, CampaignStatus, InboxType, ActivityType, NotificationType } from "@prisma/client";
+import {
+  PrismaClient,
+  Role,
+  ContactStatus,
+  DealStage,
+  Platform,
+  PostStatus,
+  CampaignStatus,
+  InboxType,
+  ActivityType,
+  NotificationType
+} from "@prisma/client";
 import { hash } from "bcryptjs";
 import { subDays, addDays } from "date-fns";
+import { encryptToken } from "../lib/crypto";
+import { normalizeCompanyKey, normalizeEmail } from "../lib/domain/contacts/identity";
 
 const prisma = new PrismaClient();
 
 async function main() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error("DATABASE_URL is required for seeding.");
+  const databaseHost = new URL(databaseUrl).hostname;
+  const localDatabase = ["localhost", "127.0.0.1", "postgres"].includes(databaseHost);
+  if (!localDatabase && process.env.ALLOW_DESTRUCTIVE_SEED !== "true") {
+    throw new Error(
+      "Refusing to reset a remote database. Set ALLOW_DESTRUCTIVE_SEED=true only after confirming the target."
+    );
+  }
+
   await prisma.$transaction([
     prisma.notification.deleteMany(),
     prisma.activity.deleteMany(),
@@ -19,6 +42,7 @@ async function main() {
     prisma.deal.deleteMany(),
     prisma.note.deleteMany(),
     prisma.contact.deleteMany(),
+    prisma.company.deleteMany(),
     prisma.socialAccount.deleteMany(),
     prisma.teamMember.deleteMany(),
     prisma.tag.deleteMany(),
@@ -26,23 +50,68 @@ async function main() {
   ]);
 
   const passwordHash = await hash("Demo1234!", 12);
-  const admin = await prisma.user.create({ data: { email: "admin@demo.com", name: "Demo Admin", role: Role.ADMIN, passwordHash, teamMemberships: { create: { role: Role.ADMIN } } } });
+  const admin = await prisma.user.create({
+    data: {
+      email: "admin@demo.com",
+      name: "Demo Admin",
+      role: Role.ADMIN,
+      passwordHash,
+      teamMemberships: { create: { role: Role.ADMIN } }
+    }
+  });
   const members = await Promise.all([
-    prisma.user.create({ data: { email: "alex@demo.com", name: "Alex Morgan", role: Role.MEMBER, passwordHash, teamMemberships: { create: { role: Role.MEMBER } } } }),
-    prisma.user.create({ data: { email: "maya@demo.com", name: "Maya Patel", role: Role.MANAGER, passwordHash, teamMemberships: { create: { role: Role.MANAGER } } } })
+    prisma.user.create({
+      data: {
+        email: "alex@demo.com",
+        name: "Alex Morgan",
+        role: Role.MEMBER,
+        passwordHash,
+        teamMemberships: { create: { role: Role.MEMBER } }
+      }
+    }),
+    prisma.user.create({
+      data: {
+        email: "maya@demo.com",
+        name: "Maya Patel",
+        role: Role.MANAGER,
+        passwordHash,
+        teamMemberships: { create: { role: Role.MANAGER } }
+      }
+    })
   ]);
   const users = [admin, ...members];
 
-  const tags = await Promise.all(["Enterprise", "Creator", "Agency", "Hot"].map((name, i) => prisma.tag.create({ data: { name, color: ["#2563eb", "#14b8a6", "#f59e0b", "#dc2626"][i] } })));
+  const tags = await Promise.all(
+    ["Enterprise", "Creator", "Agency", "Hot"].map((name, i) =>
+      prisma.tag.create({ data: { name, color: ["#2563eb", "#14b8a6", "#f59e0b", "#dc2626"][i] } })
+    )
+  );
+  const companies = await Promise.all(
+    Array.from({ length: 17 }, (_, index) => {
+      const name = `Company ${index + 1}`;
+      return prisma.company.create({
+        data: {
+          name,
+          normalizedName: normalizeCompanyKey(name)!,
+          industry: index % 2 ? "Software" : "Services",
+          ownerId: users[index % users.length].id
+        }
+      });
+    })
+  );
   const contacts = [];
   for (let i = 0; i < 50; i += 1) {
+    const email = `contact${i + 1}@example.com`;
+    const company = companies[Math.floor(i / 3)];
     contacts.push(
       await prisma.contact.create({
         data: {
           firstName: `Contact${i + 1}`,
           lastName: "Demo",
-          email: `contact${i + 1}@example.com`,
-          company: `Company ${Math.ceil((i + 1) / 3)}`,
+          email,
+          emailNormalized: normalizeEmail(email),
+          company: company.name,
+          companyId: company.id,
           jobTitle: "Marketing Lead",
           status: Object.values(ContactStatus)[i % Object.values(ContactStatus).length],
           source: i % 2 ? "LinkedIn" : "Website",
@@ -95,10 +164,17 @@ async function main() {
           platform,
           accountName: `${platform} Demo`,
           accountId: `demo-${platform}`,
-          accessToken: "mock-token",
+          accessToken: encryptToken("mock-token"),
           userId: admin.id,
           followerCount: 1000 + i * 700,
-          analytics: { create: Array.from({ length: 6 }, (_, d) => ({ followers: 1000 + d * 25 + i * 100, reach: 500 + d * 40, impressions: 900 + d * 60, engagementRate: 4 + i })) }
+          analytics: {
+            create: Array.from({ length: 6 }, (_, d) => ({
+              followers: 1000 + d * 25 + i * 100,
+              reach: 500 + d * 40,
+              impressions: 900 + d * 60,
+              engagementRate: 4 + i
+            }))
+          }
         }
       })
     )
@@ -117,20 +193,60 @@ async function main() {
           authorId: admin.id,
           socialAccountId: accounts[i % accounts.length].id,
           campaignId: campaigns[i % campaigns.length].id,
-          analytics: { create: { likes: i * 3, comments: i, shares: Math.floor(i / 2), reach: 200 + i * 40, impressions: 350 + i * 55, clicks: i * 2 } }
+          analytics: {
+            create: {
+              likes: i * 3,
+              comments: i,
+              shares: Math.floor(i / 2),
+              reach: 200 + i * 40,
+              impressions: 350 + i * 55,
+              clicks: i * 2
+            }
+          }
         }
       })
     );
   }
 
   for (let i = 0; i < 100; i += 1) {
-    await prisma.activity.create({ data: { type: Object.values(ActivityType)[i % Object.values(ActivityType).length], description: `Demo activity ${i + 1}`, userId: users[i % users.length].id, contactId: contacts[i % contacts.length].id, dealId: deals[i % deals.length].id, createdAt: subDays(new Date(), i % 90) } });
+    await prisma.activity.create({
+      data: {
+        type: Object.values(ActivityType)[i % Object.values(ActivityType).length],
+        description: `Demo activity ${i + 1}`,
+        userId: users[i % users.length].id,
+        contactId: contacts[i % contacts.length].id,
+        dealId: deals[i % deals.length].id,
+        createdAt: subDays(new Date(), i % 90)
+      }
+    });
   }
   for (let i = 0; i < 20; i += 1) {
-    await prisma.notification.create({ data: { userId: users[i % users.length].id, type: Object.values(NotificationType)[i % Object.values(NotificationType).length], title: `Notification ${i + 1}`, body: "Demo notification body", link: "/inbox", isRead: i % 3 === 0, createdAt: subDays(new Date(), i) } });
+    await prisma.notification.create({
+      data: {
+        userId: users[i % users.length].id,
+        type: Object.values(NotificationType)[i % Object.values(NotificationType).length],
+        title: `Notification ${i + 1}`,
+        body: "Demo notification body",
+        link: "/inbox",
+        isRead: i % 3 === 0,
+        createdAt: subDays(new Date(), i)
+      }
+    });
   }
   for (let i = 0; i < 20; i += 1) {
-    await prisma.inboxItem.create({ data: { platform: Object.values(Platform)[i % Object.values(Platform).length], type: Object.values(InboxType)[i % Object.values(InboxType).length], externalId: `message-${i}`, senderName: `Sender ${i + 1}`, body: "Thanks for the update. Can you send more details?", socialAccountId: accounts[i % accounts.length].id, contactId: contacts[i % contacts.length].id, isRead: i % 2 === 0, receivedAt: subDays(new Date(), i) } });
+    await prisma.inboxItem.create({
+      data: {
+        platform: Object.values(Platform)[i % Object.values(Platform).length],
+        type: Object.values(InboxType)[i % Object.values(InboxType).length],
+        externalId: `message-${i}`,
+        senderName: `Sender ${i + 1}`,
+        body: "Thanks for the update. Can you send more details?",
+        socialAccountId: accounts[i % accounts.length].id,
+        contactId: contacts[i % contacts.length].id,
+        isRead: i % 2 === 0,
+        receivedAt: subDays(new Date(), i)
+      }
+    });
   }
 
   process.stdout.write("Seed complete: admin@demo.com / Demo1234!\n");

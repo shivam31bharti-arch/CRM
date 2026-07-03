@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { authErrorResponse, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { inboxQuerySchema } from "@/lib/validations/inbox";
+import { safeSocialAccountSelect } from "@/lib/selects";
 
 export async function GET(request: Request) {
   try {
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     const [items, unreadCount] = await Promise.all([
       db.inboxItem.findMany({
         where,
-        include: { contact: true, socialAccount: true },
+        include: { contact: true, socialAccount: { select: safeSocialAccountSelect } },
         orderBy: { receivedAt: "desc" },
         take: 100
       }),
@@ -32,7 +33,10 @@ export async function GET(request: Request) {
 export async function PATCH() {
   try {
     const user = await requireUser();
-    await db.inboxItem.updateMany({ where: { socialAccount: { userId: user.id } }, data: { isRead: true } });
+    await db.inboxItem.updateMany({
+      where: { socialAccount: { userId: user.id } },
+      data: { isRead: true }
+    });
     return Response.json({ ok: true });
   } catch (error) {
     return authErrorResponse(error);

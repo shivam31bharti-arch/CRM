@@ -13,7 +13,10 @@ const notificationInputSchema = z.object({
   link: z
     .string()
     .max(500)
-    .regex(/^\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]*$/, "link must be a relative path starting with /")
+    .regex(
+      /^\/[a-zA-Z0-9\-._~:/?#[\]@!$&'()*+,;=%]*$/,
+      "link must be a relative path starting with /"
+    )
     .optional()
 });
 
@@ -21,7 +24,11 @@ export async function GET() {
   try {
     const user = await requireUser();
     const [items, unreadCount] = await Promise.all([
-      db.notification.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, take: 20 }),
+      db.notification.findMany({
+        where: { userId: user.id },
+        orderBy: { createdAt: "desc" },
+        take: 20
+      }),
       db.notification.count({ where: { userId: user.id, isRead: false } })
     ]);
     return Response.json({ items, unreadCount });

@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { WorkspaceMetrics } from "@/components/shared/WorkspaceMetrics";
+import { apiJson } from "@/lib/client-api";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 
@@ -20,6 +21,7 @@ type ContactRow = {
   lastName: string;
   email?: string | null;
   company?: string | null;
+  companyRecord?: { id: string; name: string } | null;
   status: string;
   avatarUrl?: string | null;
   assignedTo?: { name?: string | null } | null;
@@ -40,7 +42,7 @@ export function ContactTable() {
   }, [search, status, sort]);
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ["contacts", query],
-    queryFn: async () => (await fetch(`/api/contacts?${query}`)).json()
+    queryFn: () => apiJson<{ items: ContactRow[]; total: number }>(`/api/contacts?${query}`)
   });
   const items: ContactRow[] = data?.items ?? EMPTY_CONTACTS;
   const customers = items.filter((item) => item.status === "CUSTOMER").length;
@@ -103,7 +105,7 @@ export function ContactTable() {
       {isError ? (
         <ErrorState message="Contacts could not be loaded." onRetry={() => refetch()} />
       ) : null}
-      {!isLoading && items.length === 0 ? (
+      {!isLoading && !isError && items.length === 0 ? (
         <EmptyState
           title="No contacts found"
           body="Adjust the filters or use Quick add to create the first relationship in this workspace."
@@ -133,7 +135,21 @@ export function ContactTable() {
                   </Link>
                 )
               },
-              { key: "company", header: "Company", sortable: true },
+              {
+                key: "company",
+                header: "Company",
+                render: (row) =>
+                  row.companyRecord ? (
+                    <Link
+                      href={`/companies/${row.companyRecord.id}`}
+                      className="font-medium text-slate-800 hover:text-primary"
+                    >
+                      {row.companyRecord.name}
+                    </Link>
+                  ) : (
+                    (row.company ?? "Independent")
+                  )
+              },
               { key: "email", header: "Email", sortable: true },
               {
                 key: "status",
@@ -155,7 +171,7 @@ export function ContactTable() {
           />
           <div className="flex items-center justify-between text-xs text-slate-500">
             <span>
-              Showing {items.length} of {data.total} contacts
+              Showing {items.length} of {data?.total ?? 0} contacts
             </span>
             <span>Sorted by {sort.replaceAll("At", " date").toLowerCase()}</span>
           </div>

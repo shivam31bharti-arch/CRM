@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CreditCard, PlugZap, UserRound } from "lucide-react";
+import { PlugZap, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const settingsLinks = [
   { href: "/settings", label: "Profile", icon: UserRound },
-  { href: "/settings/integrations", label: "Integrations", icon: PlugZap },
-  { href: "/settings/billing", label: "Billing", icon: CreditCard }
+  { href: "/settings/integrations", label: "Integrations", icon: PlugZap }
 ];
 
 export function SettingsNav() {

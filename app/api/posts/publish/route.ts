@@ -18,11 +18,28 @@ export async function POST(request: Request) {
       include: { socialAccount: true }
     });
     if (!existing) return jsonError("Post not found.", 404);
+    if (!existing.socialAccount.isActive)
+      return jsonError("Reconnect the social account before publishing.", 409);
+    if (existing.socialAccount.tokenExpiry && existing.socialAccount.tokenExpiry <= new Date()) {
+      return jsonError(
+        "The social account token expired. Reconnect the account before publishing.",
+        409
+      );
+    }
 
     // Prevent double-publishing.
     if (existing.status === PostStatus.PUBLISHED) {
       return jsonError("Post is already published.", 409);
     }
+    if (existing.status === PostStatus.PROCESSING) {
+      return jsonError("Post publishing is already in progress.", 409);
+    }
+
+    const claim = await db.post.updateMany({
+      where: { id, status: existing.status },
+      data: { status: PostStatus.PROCESSING, processingStartedAt: new Date() }
+    });
+    if (claim.count === 0) return jsonError("Post state changed. Refresh and try again.", 409);
 
     try {
       // Decrypt OAuth credentials and call the real platform adapter.
@@ -44,6 +61,7 @@ export async function POST(request: Request) {
         where: { id },
         data: {
           status: PostStatus.PUBLISHED,
+          processingStartedAt: null,
           publishedAt: new Date(),
           externalPostId,
           errorMessage: null,
@@ -59,16 +77,17 @@ export async function POST(request: Request) {
         title: "Post published",
         body: `${post.platform} post was published successfully.`,
         link: `/scheduler`
-      });
+      }).catch((error) => console.error("[Publish] Notification failed:", error));
 
       return Response.json(post);
     } catch (publishError) {
       // If the platform API fails, mark the post as FAILED and notify.
-      const errorMessage = publishError instanceof Error ? publishError.message : "Unknown publishing error";
+      const errorMessage =
+        publishError instanceof Error ? publishError.message : "Unknown publishing error";
 
       await db.post.update({
         where: { id },
-        data: { status: PostStatus.FAILED, errorMessage }
+        data: { status: PostStatus.FAILED, processingStartedAt: null, errorMessage }
       });
 
       await createNotification({
@@ -77,7 +96,7 @@ export async function POST(request: Request) {
         title: "Post failed to publish",
         body: `${existing.platform} post could not be published: ${errorMessage}`,
         link: `/scheduler`
-      });
+      }).catch((error) => console.error("[Publish] Failure notification failed:", error));
 
       return jsonError(`Publishing failed: ${errorMessage}`, 502);
     }

@@ -1,6 +1,5 @@
 // Team API for listing and inviting members.
-// [H-2] Invite flow now generates a secure token and returns an invite link.
-//        Wire up RESEND_API_KEY to send the link via email in production.
+// Administrator-managed invite flow with a one-time temporary password.
 import { randomBytes } from "crypto";
 import { authErrorResponse, hashPassword, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -11,10 +10,16 @@ export async function GET() {
   try {
     await requireUser();
     const items = await db.teamMember.findMany({
-      include: { user: { select: { id: true, name: true, email: true, avatarUrl: true, role: true } } },
+      include: {
+        user: { select: { id: true, name: true, email: true, avatarUrl: true, role: true } }
+      },
       orderBy: { joinedAt: "desc" }
     });
-    const activity = await db.activity.findMany({ include: { user: { select: { name: true } } }, orderBy: { createdAt: "desc" }, take: 50 });
+    const activity = await db.activity.findMany({
+      include: { user: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 50
+    });
     return Response.json({ items, activity });
   } catch (error) {
     return authErrorResponse(error);
@@ -32,25 +37,40 @@ export async function POST(request: Request) {
     //        Replace with a Resend email + magic-link flow in production.
     const tempPassword = randomBytes(16).toString("hex"); // 32-char hex — user must change on first login
 
-    const user = await db.user.upsert({
-      where: { email: parsed.data.email.toLowerCase() },
-      update: { role: parsed.data.role },
-      create: {
-        email: parsed.data.email.toLowerCase(),
-        name: parsed.data.name ?? parsed.data.email.split("@")[0],
-        role: parsed.data.role,
-        passwordHash: await hashPassword(tempPassword)
-      }
+    const email = parsed.data.email.toLowerCase();
+    const existing = await db.user.findUnique({
+      where: { email },
+      include: { teamMemberships: true }
     });
+    if (existing?.isActive && existing.teamMemberships.length > 0) {
+      return jsonError("This user is already an active workspace member.", 409);
+    }
+
+    const passwordHash = await hashPassword(tempPassword);
+    const user = existing
+      ? await db.user.update({
+          where: { id: existing.id },
+          data: {
+            role: parsed.data.role,
+            isActive: true,
+            passwordHash,
+            name: parsed.data.name ?? existing.name
+          }
+        })
+      : await db.user.create({
+          data: {
+            email,
+            name: parsed.data.name ?? parsed.data.email.split("@")[0],
+            role: parsed.data.role,
+            passwordHash
+          }
+        });
 
     const member = await db.teamMember.upsert({
-      where: { id: user.id },
+      where: { userId: user.id },
       update: { role: parsed.data.role },
-      create: { id: user.id, userId: user.id, role: parsed.data.role }
+      create: { userId: user.id, role: parsed.data.role }
     });
-
-    // TODO: Send invite email via Resend when RESEND_API_KEY is configured:
-    //   await resend.emails.send({ to: user.email, subject: "You've been invited", ... })
 
     return Response.json(
       {

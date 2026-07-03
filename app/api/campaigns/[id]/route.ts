@@ -47,7 +47,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params;
     await requireUser(["ADMIN", "MANAGER"]);
-    await db.campaign.delete({ where: { id } });
+    await db.$transaction([
+      db.post.updateMany({ where: { campaignId: id }, data: { campaignId: null } }),
+      db.campaign.delete({ where: { id } })
+    ]);
     return Response.json({ ok: true });
   } catch (error) {
     return authErrorResponse(error);

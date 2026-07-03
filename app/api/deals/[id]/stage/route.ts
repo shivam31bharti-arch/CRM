@@ -15,6 +15,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (parsed.data.stage === DealStage.CLOSED_LOST && !parsed.data.lostReason) {
       return jsonError("Lost reason is required when marking a deal as lost.", 422);
     }
+    if (user.role === "MEMBER") {
+      const owned = await db.deal.findFirst({
+        where: { id, assignedToId: user.id },
+        select: { id: true }
+      });
+      if (!owned) return jsonError("Deal not found or access denied.", 403);
+    }
     const deal = await db.deal.update({
       where: { id },
       data: {

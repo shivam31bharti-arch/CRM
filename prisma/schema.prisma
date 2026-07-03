@@ -10,28 +10,32 @@ datasource db {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  email          String    @unique
-  name           String?
-  avatarUrl      String?
-  role           Role      @default(MEMBER)
-  passwordHash   String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  lastLoginAt    DateTime?
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  avatarUrl    String?
+  role         Role      @default(MEMBER)
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastLoginAt  DateTime?
+  isActive     Boolean   @default(true)
 
-  assignedContacts  Contact[]       @relation("AssignedTo")
-  createdContacts   Contact[]       @relation("CreatedBy")
-  assignedDeals     Deal[]          @relation("DealAssignedTo")
-  activities        Activity[]
-  notifications     Notification[]
-  teamMemberships   TeamMember[]
-  socialAccounts    SocialAccount[]
-  posts             Post[]
-  notes             Note[]
-  sessions          Session[]
-  webhooks          Webhook[]
-  apiKeys           ApiKey[]
+  assignedContacts    Contact[]            @relation("AssignedTo")
+  createdContacts     Contact[]            @relation("CreatedBy")
+  assignedDeals       Deal[]               @relation("DealAssignedTo")
+  ownedCompanies      Company[]            @relation("CompanyOwner")
+  activities          Activity[]
+  notifications       Notification[]
+  teamMemberships     TeamMember[]
+  socialAccounts      SocialAccount[]
+  posts               Post[]
+  notes               Note[]
+  sessions            Session[]
+  webhooks            Webhook[]
+  apiKeys             ApiKey[]
+  googleConnection    GoogleConnection?
+  googleOAuthAttempts GoogleOAuthAttempt[]
 }
 
 model Session {
@@ -44,35 +48,65 @@ model Session {
 }
 
 model Contact {
-  id           String    @id @default(cuid())
-  firstName    String
-  lastName     String
-  email        String?
-  phone        String?
-  company      String?
-  jobTitle     String?
-  website      String?
-  avatarUrl    String?
-  status       ContactStatus @default(LEAD)
-  source       String?
-  tags         Tag[]
-  customFields Json?
-  notes        Note[]
-  activities   Activity[]
-  deals        Deal[]
-  createdById  String
-  assignedToId String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id              String        @id @default(cuid())
+  firstName       String
+  lastName        String
+  email           String?
+  emailNormalized String?
+  phone           String?
+  phoneNormalized String?
+  company         String?
+  companyId       String?
+  jobTitle        String?
+  website         String?
+  avatarUrl       String?
+  status          ContactStatus @default(LEAD)
+  source          String?
+  tags            Tag[]
+  customFields    Json?
+  notes           Note[]
+  activities      Activity[]
+  deals           Deal[]
+  createdById     String
+  assignedToId    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  createdBy    User      @relation("CreatedBy", fields: [createdById], references: [id])
-  assignedTo   User?     @relation("AssignedTo", fields: [assignedToId], references: [id])
-  campaigns    CampaignContact[]
-  inboxItems   InboxItem[]
+  createdBy     User                  @relation("CreatedBy", fields: [createdById], references: [id])
+  assignedTo    User?                 @relation("AssignedTo", fields: [assignedToId], references: [id])
+  companyRecord Company?              @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  campaigns     CampaignContact[]
+  inboxItems    InboxItem[]
+  googleEmails  GoogleEmailRecord[]
+  googleEvents  GoogleCalendarEvent[]
 
   @@index([email])
+  @@index([emailNormalized])
+  @@index([phoneNormalized])
+  @@index([companyId])
   @@index([assignedToId])
   @@index([status])
+  @@index([createdAt])
+}
+
+model Company {
+  id             String    @id @default(cuid())
+  name           String
+  normalizedName String    @unique
+  website        String?
+  industry       String?
+  phone          String?
+  description    String?
+  ownerId        String?
+  archivedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  owner    User?     @relation("CompanyOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  contacts Contact[]
+
+  @@index([name])
+  @@index([ownerId])
   @@index([createdAt])
 }
 
@@ -93,36 +127,36 @@ model Note {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  deal      Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  author    User     @relation(fields: [authorId], references: [id])
+  contact Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  deal    Deal?    @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  author  User     @relation(fields: [authorId], references: [id])
 
   @@index([contactId])
   @@index([dealId])
 }
 
 model Deal {
-  id           String     @id @default(cuid())
+  id           String    @id @default(cuid())
   title        String
-  value        Float      @default(0)
-  currency     String     @default("USD")
-  stage        DealStage  @default(LEAD)
-  probability  Int        @default(0)
+  value        Float     @default(0)
+  currency     String    @default("USD")
+  stage        DealStage @default(LEAD)
+  probability  Int       @default(0)
   closeDate    DateTime?
   description  String?
   contactId    String?
   assignedToId String?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   wonAt        DateTime?
   lostAt       DateTime?
   lostReason   String?
 
-  contact      Contact?   @relation(fields: [contactId], references: [id])
-  assignedTo   User?      @relation("DealAssignedTo", fields: [assignedToId], references: [id])
-  activities   Activity[]
-  notes        Note[]
-  campaigns    CampaignDeal[]
+  contact    Contact?       @relation(fields: [contactId], references: [id])
+  assignedTo User?          @relation("DealAssignedTo", fields: [assignedToId], references: [id])
+  activities Activity[]
+  notes      Note[]
+  campaigns  CampaignDeal[]
 
   @@index([stage])
   @@index([assignedToId])
@@ -130,51 +164,52 @@ model Deal {
 }
 
 model SocialAccount {
-  id           String        @id @default(cuid())
-  platform     Platform
-  accountName  String
-  accountId    String
-  accessToken  String
-  refreshToken String?
-  tokenExpiry  DateTime?
-  avatarUrl    String?
-  followerCount Int?         @default(0)
-  userId       String
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id            String    @id @default(cuid())
+  platform      Platform
+  accountName   String
+  accountId     String
+  accessToken   String
+  refreshToken  String?
+  tokenExpiry   DateTime?
+  avatarUrl     String?
+  followerCount Int?      @default(0)
+  userId        String
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  posts        Post[]
-  analytics    PlatformAnalytic[]
-  inboxItems   InboxItem[]
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posts      Post[]
+  analytics  PlatformAnalytic[]
+  inboxItems InboxItem[]
 
   @@unique([platform, accountId])
   @@index([userId])
 }
 
 model Post {
-  id              String      @id @default(cuid())
-  body            String
-  mediaUrls       String[]    @default([])
-  platform        Platform
-  status          PostStatus  @default(DRAFT)
-  scheduledAt     DateTime?
-  publishedAt     DateTime?
-  externalPostId  String?
-  errorMessage    String?
-  isRecurring     Boolean     @default(false)
-  recurringRule   String?
-  authorId        String
-  socialAccountId String
-  campaignId      String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id                  String     @id @default(cuid())
+  body                String
+  mediaUrls           String[]   @default([])
+  platform            Platform
+  status              PostStatus @default(DRAFT)
+  scheduledAt         DateTime?
+  publishedAt         DateTime?
+  externalPostId      String?
+  errorMessage        String?
+  isRecurring         Boolean    @default(false)
+  recurringRule       String?
+  processingStartedAt DateTime?
+  authorId            String
+  socialAccountId     String
+  campaignId          String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
-  author          User        @relation(fields: [authorId], references: [id])
-  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id])
-  campaign        Campaign?   @relation(fields: [campaignId], references: [id])
-  analytics       PostAnalytic[]
+  author        User           @relation(fields: [authorId], references: [id])
+  socialAccount SocialAccount  @relation(fields: [socialAccountId], references: [id])
+  campaign      Campaign?      @relation(fields: [campaignId], references: [id])
+  analytics     PostAnalytic[]
 
   @@index([scheduledAt])
   @@index([status])
@@ -193,46 +228,46 @@ model PostAnalytic {
   clicks      Int      @default(0)
   recordedAt  DateTime @default(now())
 
-  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   @@index([postId])
   @@index([recordedAt])
 }
 
 model PlatformAnalytic {
-  id              String        @id @default(cuid())
+  id              String   @id @default(cuid())
   socialAccountId String
-  followers       Int           @default(0)
-  following       Int           @default(0)
-  reach           Int           @default(0)
-  impressions     Int           @default(0)
-  engagementRate  Float         @default(0)
-  recordedAt      DateTime      @default(now())
+  followers       Int      @default(0)
+  following       Int      @default(0)
+  reach           Int      @default(0)
+  impressions     Int      @default(0)
+  engagementRate  Float    @default(0)
+  recordedAt      DateTime @default(now())
 
-  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id], onDelete: Cascade)
 
   @@index([socialAccountId])
   @@index([recordedAt])
 }
 
 model InboxItem {
-  id              String      @id @default(cuid())
+  id              String    @id @default(cuid())
   platform        Platform
   type            InboxType
   externalId      String
   senderName      String
   senderAvatarUrl String?
   body            String
-  isRead          Boolean     @default(false)
-  isReplied       Boolean     @default(false)
+  isRead          Boolean   @default(false)
+  isReplied       Boolean   @default(false)
   replyBody       String?
   repliedAt       DateTime?
   contactId       String?
   socialAccountId String
-  receivedAt      DateTime    @default(now())
+  receivedAt      DateTime  @default(now())
 
-  contact         Contact?    @relation(fields: [contactId], references: [id])
-  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id])
+  contact       Contact?      @relation(fields: [contactId], references: [id])
+  socialAccount SocialAccount @relation(fields: [socialAccountId], references: [id])
 
   @@unique([platform, externalId])
   @@index([isRead])
@@ -241,55 +276,57 @@ model InboxItem {
 }
 
 model Campaign {
-  id          String    @id @default(cuid())
+  id          String         @id @default(cuid())
   name        String
   description String?
   status      CampaignStatus @default(DRAFT)
   startDate   DateTime?
   endDate     DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
-  posts       Post[]
-  contacts    CampaignContact[]
-  deals       CampaignDeal[]
+  posts    Post[]
+  contacts CampaignContact[]
+  deals    CampaignDeal[]
 }
 
 model CampaignContact {
-  campaignId  String
-  contactId   String
-  addedAt     DateTime @default(now())
+  campaignId String
+  contactId  String
+  addedAt    DateTime @default(now())
 
-  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  contact     Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   @@id([campaignId, contactId])
 }
 
 model CampaignDeal {
-  campaignId  String
-  dealId      String
-  addedAt     DateTime @default(now())
+  campaignId String
+  dealId     String
+  addedAt    DateTime @default(now())
 
-  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
-  deal        Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  deal     Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@id([campaignId, dealId])
 }
 
 model Activity {
-  id          String        @id @default(cuid())
+  id          String       @id @default(cuid())
   type        ActivityType
   description String
   metadata    Json?
   userId      String
   contactId   String?
   dealId      String?
-  createdAt   DateTime      @default(now())
+  createdAt   DateTime     @default(now())
 
-  user        User          @relation(fields: [userId], references: [id])
-  contact     Contact?      @relation(fields: [contactId], references: [id])
-  deal        Deal?         @relation(fields: [dealId], references: [id])
+  user                User                 @relation(fields: [userId], references: [id])
+  contact             Contact?             @relation(fields: [contactId], references: [id])
+  deal                Deal?                @relation(fields: [dealId], references: [id])
+  googleEmail         GoogleEmailRecord?
+  googleCalendarEvent GoogleCalendarEvent?
 
   @@index([contactId])
   @@index([dealId])
@@ -298,28 +335,28 @@ model Activity {
 }
 
 model Notification {
-  id        String             @id @default(cuid())
+  id        String           @id @default(cuid())
   userId    String
   type      NotificationType
   title     String
   body      String
   link      String?
-  isRead    Boolean            @default(false)
-  createdAt DateTime           @default(now())
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
 
-  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, isRead])
   @@index([createdAt])
 }
 
 model TeamMember {
-  id        String   @id @default(cuid())
-  userId    String
-  role      Role
-  joinedAt  DateTime @default(now())
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  role     Role
+  joinedAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Webhook {
@@ -331,26 +368,145 @@ model Webhook {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
 
 model ApiKey {
-  id        String    @id @default(cuid())
-  userId    String
-  name      String
-  prefix    String
-  keyHash   String
-  lastFour  String
-  createdAt DateTime  @default(now())
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  prefix     String
+  keyHash    String
+  lastFour   String
+  createdAt  DateTime  @default(now())
   lastUsedAt DateTime?
-  revokedAt DateTime?
+  revokedAt  DateTime?
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
   @@unique([keyHash])
+  @@index([userId])
+}
+
+model GoogleConnection {
+  id                    String                 @id @default(cuid())
+  userId                String                 @unique
+  email                 String
+  accessToken           String
+  refreshToken          String?
+  tokenExpiry           DateTime?
+  scopes                String[]
+  status                GoogleConnectionStatus @default(CONNECTED)
+  gmailHistoryId        String?
+  gmailPageToken        String?
+  gmailInitialHistoryId String?
+  calendarSyncToken     String?
+  calendarPageToken     String?
+  calendarWindowStartAt DateTime?
+  calendarWindowEndAt   DateTime?
+  syncLockId            String?
+  syncLockedAt          DateTime?
+  lastSyncedAt          DateTime?
+  lastError             String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  oauthAttempts  GoogleOAuthAttempt[]
+  syncRuns       GoogleSyncRun[]
+  emailRecords   GoogleEmailRecord[]
+  calendarEvents GoogleCalendarEvent[]
+
+  @@index([status])
+  @@index([lastSyncedAt])
+}
+
+model GoogleOAuthAttempt {
+  id           String    @id @default(cuid())
+  userId       String
+  connectionId String?
+  stateHash    String    @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection GoogleConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model GoogleSyncRun {
+  id             String              @id @default(cuid())
+  connectionId   String
+  trigger        GoogleSyncTrigger
+  status         GoogleSyncRunStatus @default(RUNNING)
+  emailsImported Int                 @default(0)
+  eventsImported Int                 @default(0)
+  error          String?
+  startedAt      DateTime            @default(now())
+  finishedAt     DateTime?
+
+  connection GoogleConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([connectionId, startedAt])
+  @@index([status])
+}
+
+model GoogleEmailRecord {
+  id           String               @id @default(cuid())
+  connectionId String
+  externalId   String
+  threadId     String?
+  historyId    String?
+  direction    GoogleEmailDirection
+  subject      String?
+  fromEmail    String?
+  fromName     String?
+  toEmails     String[]
+  ccEmails     String[]
+  receivedAt   DateTime
+  contactId    String?
+  activityId   String?              @unique
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  connection GoogleConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  contact    Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  activity   Activity?        @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@unique([connectionId, externalId])
+  @@index([contactId])
+  @@index([receivedAt])
+}
+
+model GoogleCalendarEvent {
+  id              String    @id @default(cuid())
+  connectionId    String
+  calendarId      String
+  externalId      String
+  iCalUid         String?
+  title           String?
+  status          String
+  organizerEmail  String?
+  attendeeEmails  String[]
+  startsAt        DateTime?
+  endsAt          DateTime?
+  contactId       String?
+  activityId      String?   @unique
+  sourceUpdatedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  connection GoogleConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  contact    Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  activity   Activity?        @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@unique([connectionId, calendarId, externalId])
+  @@index([contactId])
+  @@index([startsAt])
 }
 
 enum Role {
@@ -386,6 +542,7 @@ enum Platform {
 enum PostStatus {
   DRAFT
   SCHEDULED
+  PROCESSING
   PUBLISHED
   FAILED
   CANCELLED
@@ -408,10 +565,33 @@ enum ActivityType {
   DEAL_LOST
   NOTE_ADDED
   EMAIL_SENT
+  EMAIL_RECEIVED
   CALL_LOGGED
   MEETING_SCHEDULED
   POST_PUBLISHED
   POST_SCHEDULED
+}
+
+enum GoogleConnectionStatus {
+  CONNECTED
+  REAUTH_REQUIRED
+}
+
+enum GoogleSyncTrigger {
+  MANUAL
+  SCHEDULED
+  INITIAL
+}
+
+enum GoogleSyncRunStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum GoogleEmailDirection {
+  INBOUND
+  OUTBOUND
 }
 
 enum InboxType {

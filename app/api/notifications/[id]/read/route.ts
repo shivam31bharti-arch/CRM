@@ -6,7 +6,10 @@ export async function PATCH(_: Request, { params }: { params: Promise<{ id: stri
   try {
     const { id } = await params;
     const user = await requireUser();
-    const notification = await db.notification.update({ where: { id, userId: user.id }, data: { isRead: true } });
+    const notification = await db.notification.update({
+      where: { id, userId: user.id },
+      data: { isRead: true }
+    });
     return Response.json(notification);
   } catch (error) {
     return authErrorResponse(error);

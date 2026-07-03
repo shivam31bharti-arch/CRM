@@ -7,7 +7,7 @@ export default function ComposePage() {
       <PageHeader
         eyebrow="Content Studio"
         title="Compose & Schedule"
-        description="Create channel-aware content with a live preview, reliable draft saving, and precise delivery controls."
+        description="Create channel-aware content with restored local drafts and delivery aligned to the current sync cadence."
       />
       <PostComposer />
     </>

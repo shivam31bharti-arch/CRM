@@ -1,7 +1,15 @@
 // Avatar component with deterministic initials fallback.
 import { cn } from "@/lib/utils";
 
-export function Avatar({ name, src, className }: { name?: string | null; src?: string | null; className?: string }) {
+export function Avatar({
+  name,
+  src,
+  className
+}: {
+  name?: string | null;
+  src?: string | null;
+  className?: string;
+}) {
   const initials =
     name
       ?.split(" ")

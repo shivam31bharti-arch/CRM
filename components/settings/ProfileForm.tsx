@@ -7,12 +7,21 @@ import { Avatar } from "@/components/shared/Avatar";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { apiJson } from "@/lib/client-api";
+
+type Profile = {
+  id: string;
+  name?: string | null;
+  email: string;
+  avatarUrl?: string | null;
+  role: string;
+};
 
 export function ProfileForm() {
   const [message, setMessage] = useState("");
   const { data } = useQuery({
     queryKey: ["profile"],
-    queryFn: async () => (await fetch("/api/settings/profile")).json()
+    queryFn: () => apiJson<Profile>("/api/settings/profile")
   });
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {

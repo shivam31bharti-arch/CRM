@@ -27,17 +27,19 @@ export function DataTable<T extends { id: string }>({
                 key={String(column.key)}
                 className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase text-slate-500"
               >
-                <button
-                  type="button"
-                  className="focus-ring inline-flex items-center gap-1 rounded"
-                  onClick={() => column.sortable && onSort?.(String(column.key))}
-                  aria-label={column.sortable ? `Sort by ${column.header}` : undefined}
-                >
-                  {column.header}
-                  {column.sortable ? (
+                {column.sortable ? (
+                  <button
+                    type="button"
+                    className="focus-ring inline-flex items-center gap-1 rounded"
+                    onClick={() => onSort?.(String(column.key))}
+                    aria-label={`Sort by ${column.header}`}
+                  >
+                    {column.header}
                     <ArrowUpDown className="h-3.5 w-3.5" aria-hidden="true" />
-                  ) : null}
-                </button>
+                  </button>
+                ) : (
+                  column.header
+                )}
               </th>
             ))}
           </tr>

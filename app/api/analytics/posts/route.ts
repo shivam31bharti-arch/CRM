@@ -3,6 +3,7 @@ import { authErrorResponse, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { jsonError, toCsv } from "@/lib/utils";
 import { z } from "zod";
+import { safeSocialAccountSelect } from "@/lib/selects";
 
 const dateParam = z.string().datetime({ offset: true }).optional();
 
@@ -20,7 +21,10 @@ export async function GET(request: Request) {
           ? [{ createdAt: { gte: from } }, { analytics: { some: { recordedAt: { gte: from } } } }]
           : undefined
       },
-      include: { analytics: { orderBy: { recordedAt: "desc" }, take: 1 }, socialAccount: true },
+      include: {
+        analytics: { orderBy: { recordedAt: "desc" }, take: 1 },
+        socialAccount: { select: safeSocialAccountSelect }
+      },
       orderBy: { createdAt: "desc" },
       take: 100
     });

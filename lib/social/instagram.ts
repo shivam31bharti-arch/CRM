@@ -2,7 +2,7 @@
 // Works with Instagram Professional accounts connected to a Facebook Page.
 // Requires an Instagram Business/Creator account linked to a Facebook Page.
 
-const GRAPH_API = "https://graph.facebook.com/v19.0";
+import { readMetaGraphApiVersion } from "./meta-config";
 
 export interface InstagramPostResult {
   externalId: string;
@@ -24,6 +24,7 @@ export async function publishInstagramPost(
   igUserId: string,
   mediaUrls: string[] = []
 ): Promise<InstagramPostResult> {
+  const graphApi = `https://graph.facebook.com/${readMetaGraphApiVersion()}`;
   if (mediaUrls.length === 0) {
     throw new Error(
       "Instagram requires at least one image URL. Text-only posts are not supported on Instagram feed."
@@ -31,7 +32,7 @@ export async function publishInstagramPost(
   }
 
   // Step 1: Create the media container.
-  const containerRes = await fetch(`${GRAPH_API}/${igUserId}/media`, {
+  const containerRes = await fetch(`${graphApi}/${igUserId}/media`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -42,15 +43,18 @@ export async function publishInstagramPost(
   });
 
   if (!containerRes.ok) {
-    const errData = await containerRes.json().catch(() => ({ error: { message: containerRes.statusText } }));
-    const msg = (errData as { error?: { message?: string } }).error?.message ?? containerRes.statusText;
+    const errData = await containerRes
+      .json()
+      .catch(() => ({ error: { message: containerRes.statusText } }));
+    const msg =
+      (errData as { error?: { message?: string } }).error?.message ?? containerRes.statusText;
     throw new Error(`Instagram container creation error ${containerRes.status}: ${msg}`);
   }
 
   const { id: containerId } = (await containerRes.json()) as { id: string };
 
   // Step 2: Publish the container (may need polling for videos; images are synchronous).
-  const publishRes = await fetch(`${GRAPH_API}/${igUserId}/media_publish`, {
+  const publishRes = await fetch(`${graphApi}/${igUserId}/media_publish`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -60,8 +64,11 @@ export async function publishInstagramPost(
   });
 
   if (!publishRes.ok) {
-    const errData = await publishRes.json().catch(() => ({ error: { message: publishRes.statusText } }));
-    const msg = (errData as { error?: { message?: string } }).error?.message ?? publishRes.statusText;
+    const errData = await publishRes
+      .json()
+      .catch(() => ({ error: { message: publishRes.statusText } }));
+    const msg =
+      (errData as { error?: { message?: string } }).error?.message ?? publishRes.statusText;
     throw new Error(`Instagram publish error ${publishRes.status}: ${msg}`);
   }
 

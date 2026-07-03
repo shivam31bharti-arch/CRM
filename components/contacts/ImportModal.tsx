@@ -15,8 +15,18 @@ export function ImportModal({ onImported }: { onImported?: () => void }) {
 
   async function importCsv() {
     const response = await fetch("/api/contacts/import", { method: "POST", body: csv });
-    setMessage(response.ok ? "Contacts imported." : "Import could not be completed.");
-    if (response.ok) await queryClient.invalidateQueries({ queryKey: ["contacts"] });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setMessage(body.errors?.[0] ?? body.error ?? "Import could not be completed.");
+      return;
+    }
+    const duplicates = Array.isArray(body.duplicates) ? body.duplicates.length : 0;
+    const invalid = Array.isArray(body.errors) ? body.errors.length : 0;
+    setMessage(
+      `${body.created ?? 0} created, ${duplicates} duplicates skipped, ${invalid} invalid rows.`
+    );
+    await queryClient.invalidateQueries({ queryKey: ["contacts"] });
+    await queryClient.invalidateQueries({ queryKey: ["companies"] });
     onImported?.();
   }
 
@@ -45,7 +55,11 @@ export function ImportModal({ onImported }: { onImported?: () => void }) {
         <FileUp className="h-4 w-4" aria-hidden="true" />
         Import CSV
       </Button>
-      {message ? <p className="mt-3 text-xs font-medium text-slate-600">{message}</p> : null}
+      {message ? (
+        <p className="mt-3 text-xs font-medium text-slate-600" aria-live="polite">
+          {message}
+        </p>
+      ) : null}
     </div>
   );
 }

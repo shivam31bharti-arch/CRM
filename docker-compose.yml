@@ -1,4 +1,4 @@
-# Local development stack for app, PostgreSQL, and Redis.
+# Local development stack for the app and PostgreSQL.
 services:
   postgres:
     image: postgres:16-alpine
@@ -17,19 +17,11 @@ services:
       timeout: 5s
       retries: 10
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      # [M-7] Bind Redis to loopback only as well.
-      - "127.0.0.1:6379:6379"
-
   app:
     build: .
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_started
     environment:
       DATABASE_URL: postgresql://crm:crm@postgres:5432/crm?schema=public
       NEXTAUTH_URL: http://localhost:3000
@@ -39,9 +31,6 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:-local-development-secret-change-me-in-production}
       # Generate with: openssl rand -hex 32
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
-      # Generate with: openssl rand -base64 32
-      API_KEY_SECRET: ${API_KEY_SECRET:-}
-      REDIS_URL: redis://redis:6379
     ports:
       - "3000:3000"
 

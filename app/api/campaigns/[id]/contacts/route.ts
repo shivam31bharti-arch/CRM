@@ -27,7 +27,9 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     await requireUser();
     const parsed = campaignLinkSchema.safeParse(await request.json());
     if (!parsed.success) return jsonError("Contact id is required.", 422);
-    await db.campaignContact.delete({ where: { campaignId_contactId: { campaignId: id, contactId: parsed.data.id } } });
+    await db.campaignContact.delete({
+      where: { campaignId_contactId: { campaignId: id, contactId: parsed.data.id } }
+    });
     return Response.json({ ok: true });
   } catch (error) {
     return authErrorResponse(error);

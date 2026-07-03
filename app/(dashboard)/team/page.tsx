@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { Activity, ShieldCheck, UserRoundCog, Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LoadingState } from "@/components/shared/LoadingState";
@@ -8,6 +9,7 @@ import { WorkspaceMetrics } from "@/components/shared/WorkspaceMetrics";
 import { ActivityFeed } from "@/components/team/ActivityFeed";
 import { InviteModal } from "@/components/team/InviteModal";
 import { TeamTable, type TeamMemberRow } from "@/components/team/TeamTable";
+import { apiJson } from "@/lib/client-api";
 
 type ActivityRow = {
   id: string;
@@ -19,9 +21,10 @@ const EMPTY_MEMBERS: TeamMemberRow[] = [];
 const EMPTY_ACTIVITY: ActivityRow[] = [];
 
 export default function TeamPage() {
+  const { data: session } = useSession();
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["team"],
-    queryFn: async () => (await fetch("/api/team")).json()
+    queryFn: () => apiJson<{ items: TeamMemberRow[]; activity: ActivityRow[] }>("/api/team")
   });
   const members: TeamMemberRow[] = data?.items ?? EMPTY_MEMBERS;
   const activity: ActivityRow[] = data?.activity ?? EMPTY_ACTIVITY;
@@ -71,9 +74,14 @@ export default function TeamPage() {
               }
             ]}
           />
-          <InviteModal onInvited={() => refetch()} />
+          {session?.user?.role === "ADMIN" ? <InviteModal onInvited={() => refetch()} /> : null}
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
-            <TeamTable members={members} />
+            <TeamTable
+              members={members}
+              canManage={session?.user?.role === "ADMIN"}
+              currentUserId={session?.user?.id}
+              onChanged={() => refetch()}
+            />
             <ActivityFeed items={activity} />
           </div>
         </div>

@@ -2,7 +2,7 @@
 // Publishes to a Facebook Page (not a personal profile — Pages API only).
 // Requires a Page access token stored in the SocialAccount record.
 
-const GRAPH_API = "https://graph.facebook.com/v19.0";
+import { readMetaGraphApiVersion } from "./meta-config";
 
 export interface FacebookPostResult {
   externalId: string;
@@ -22,12 +22,13 @@ export async function publishFacebookPost(
   pageId: string,
   mediaUrls: string[] = []
 ): Promise<FacebookPostResult> {
+  const graphApi = `https://graph.facebook.com/${readMetaGraphApiVersion()}`;
   let endpoint: string;
   let requestBody: Record<string, string>;
 
   if (mediaUrls.length > 0) {
     // Post with photo — uses /photos endpoint.
-    endpoint = `${GRAPH_API}/${pageId}/photos`;
+    endpoint = `${graphApi}/${pageId}/photos`;
     requestBody = {
       caption: body,
       url: mediaUrls[0],
@@ -36,7 +37,7 @@ export async function publishFacebookPost(
     };
   } else {
     // Text-only post — uses /feed endpoint.
-    endpoint = `${GRAPH_API}/${pageId}/feed`;
+    endpoint = `${graphApi}/${pageId}/feed`;
     requestBody = {
       message: body,
       access_token: accessToken

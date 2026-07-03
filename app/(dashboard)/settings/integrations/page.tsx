@@ -1,13 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { KeyRound, PlugZap, Radio, Users } from "lucide-react";
+import { PlugZap, Radio, Users } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { WorkspaceMetrics } from "@/components/shared/WorkspaceMetrics";
-import { ApiKeyManager } from "@/components/settings/ApiKeyManager";
 import { IntegrationCard } from "@/components/settings/IntegrationCard";
+import { GoogleWorkspaceCard } from "@/components/settings/GoogleWorkspaceCard";
 import { SettingsNav } from "@/components/settings/SettingsNav";
-import { WebhookManager } from "@/components/settings/WebhookManager";
+import { apiJson } from "@/lib/client-api";
 
 type PlatformConnection = {
   platform: string;
@@ -18,7 +18,7 @@ const EMPTY_CONNECTIONS: PlatformConnection[] = [];
 export default function IntegrationsPage() {
   const { data, refetch } = useQuery({
     queryKey: ["integrations"],
-    queryFn: async () => (await fetch("/api/settings/integrations")).json()
+    queryFn: () => apiJson<{ platforms: PlatformConnection[] }>("/api/settings/integrations")
   });
   const platforms: PlatformConnection[] = data?.platforms ?? EMPTY_CONNECTIONS;
   const connected = platforms.filter((item) => item.account?.isActive).length;
@@ -28,7 +28,7 @@ export default function IntegrationsPage() {
       <PageHeader
         eyebrow="Account"
         title="Integration Hub"
-        description="Connect customer channels and extend the CRM with secure automation endpoints."
+        description="Connect approved social channels for publishing. Analytics and inbox ingestion remain production roadmap work."
       />
       <SettingsNav />
       <div className="space-y-4">
@@ -54,17 +54,11 @@ export default function IntegrationsPage() {
               helper: "Known followers",
               icon: Users,
               tone: "violet"
-            },
-            {
-              label: "Developer access",
-              value: "Ready",
-              helper: "Webhooks and keys",
-              icon: KeyRound,
-              tone: "amber"
             }
           ]}
         />
         <div className="grid gap-4 md:grid-cols-2">
+          <GoogleWorkspaceCard />
           {platforms.map((item) => (
             <IntegrationCard
               key={item.platform}
@@ -73,10 +67,6 @@ export default function IntegrationsPage() {
               onChanged={() => refetch()}
             />
           ))}
-        </div>
-        <div className="grid gap-4 xl:grid-cols-2">
-          <WebhookManager />
-          <ApiKeyManager />
         </div>
       </div>
     </>

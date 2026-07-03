@@ -21,17 +21,15 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const [contacts, deals, posts, inbox, activities, intelligence] = await Promise.all([
-    db.contact.count().catch(() => 0),
-    db.deal.count().catch(() => 0),
-    db.post.count().catch(() => 0),
-    db.inboxItem.count({ where: { isRead: false } }).catch(() => 0),
-    db.activity
-      .findMany({
-        include: { user: { select: { name: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 10
-      })
-      .catch(() => []),
+    db.contact.count(),
+    db.deal.count(),
+    db.post.count(),
+    db.inboxItem.count({ where: { isRead: false } }),
+    db.activity.findMany({
+      include: { user: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 10
+    }),
     getRevenueCommandCenter()
   ]);
   const cards = [

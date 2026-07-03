@@ -36,7 +36,11 @@ export default function RegisterPage() {
       setLoading(false);
       return;
     }
-    await signIn("credentials", { email: payload.email, password: payload.password, redirect: false });
+    await signIn("credentials", {
+      email: payload.email,
+      password: payload.password,
+      redirect: false
+    });
     router.replace("/");
     router.refresh();
   }
@@ -45,8 +49,10 @@ export default function RegisterPage() {
     <Card className="p-6 shadow-panel">
       <div className="mb-6">
         <BrandMark className="mb-6" />
-        <h1 className="text-2xl font-bold">Create your account</h1>
-        <p className="mt-1 text-sm text-slate-500">Join the Kai &amp; Co. internal workspace for client and pipeline operations.</p>
+        <h1 className="text-2xl font-bold">Initialize workspace</h1>
+        <p className="mt-1 text-sm text-slate-500">
+          Create the first administrator account. After setup, access is invite-only.
+        </p>
       </div>
       <form className="space-y-4" onSubmit={onSubmit}>
         <label className="block text-sm font-medium">
@@ -59,11 +65,18 @@ export default function RegisterPage() {
         </label>
         <label className="block text-sm font-medium">
           Password
-          <Input className="mt-1" name="password" type="password" required minLength={8} autoComplete="new-password" />
+          <Input
+            className="mt-1"
+            name="password"
+            type="password"
+            required
+            minLength={8}
+            autoComplete="new-password"
+          />
         </label>
         {error ? <p className="rounded-md bg-red-50 p-2 text-sm text-red-700">{error}</p> : null}
         <Button className="w-full" disabled={loading}>
-          {loading ? "Creating..." : "Create account"}
+          {loading ? "Creating..." : "Create administrator"}
         </Button>
       </form>
       <p className="mt-5 text-center text-sm text-slate-500">

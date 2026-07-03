@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import { cn } from "@/lib/utils";
+import { apiJson } from "@/lib/client-api";
 
 type ViewMode = "calendar" | "list";
 const EMPTY_POSTS: PostRow[] = [];
@@ -65,7 +66,7 @@ export function CalendarView() {
   const [status, setStatus] = useState("ALL");
   const { data, isLoading } = useQuery({
     queryKey: ["posts"],
-    queryFn: async () => (await fetch("/api/posts")).json()
+    queryFn: () => apiJson<{ items: PostRow[] }>("/api/posts")
   });
 
   const posts: PostRow[] = data?.items ?? EMPTY_POSTS;
@@ -194,6 +195,7 @@ export function CalendarView() {
             <option value="ALL">All statuses</option>
             <option value="DRAFT">Draft</option>
             <option value="SCHEDULED">Scheduled</option>
+            <option value="PROCESSING">Processing</option>
             <option value="PUBLISHED">Published</option>
             <option value="FAILED">Failed</option>
           </Select>

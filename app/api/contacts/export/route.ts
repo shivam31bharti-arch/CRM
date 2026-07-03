@@ -8,10 +8,26 @@ export async function GET() {
     await requireUser();
     const contacts = await db.contact.findMany({
       orderBy: { createdAt: "desc" },
-      select: { firstName: true, lastName: true, email: true, phone: true, company: true, status: true, createdAt: true }
+      select: {
+        firstName: true,
+        lastName: true,
+        email: true,
+        phone: true,
+        company: true,
+        companyRecord: { select: { name: true } },
+        status: true,
+        createdAt: true
+      }
     });
-    return new Response(toCsv(contacts), {
-      headers: { "Content-Type": "text/csv", "Content-Disposition": "attachment; filename=contacts.csv" }
+    const rows = contacts.map(({ companyRecord, ...contact }) => ({
+      ...contact,
+      company: companyRecord?.name ?? contact.company
+    }));
+    return new Response(toCsv(rows), {
+      headers: {
+        "Content-Type": "text/csv",
+        "Content-Disposition": "attachment; filename=contacts.csv"
+      }
     });
   } catch (error) {
     return authErrorResponse(error);

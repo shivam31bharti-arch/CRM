@@ -6,10 +6,8 @@ WORKDIR /app
 RUN apt-get -o Acquire::Check-Date=false update \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
   && rm -rf /var/lib/apt/lists/*
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev --ignore-scripts
-# Reinstall with dev deps for prisma generate
-RUN npm install --ignore-scripts
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
 
 # ── Stage 2: build ───────────────────────────────────────────────────────────
 FROM node:22-bookworm-slim AS builder
@@ -30,7 +28,6 @@ COPY types ./types
 COPY public ./public
 COPY next.config.mjs tsconfig.json postcss.config.js tailwind.config.ts package.json ./
 
-RUN npx prisma generate
 RUN npm run build
 
 # ── Stage 3: production runner ───────────────────────────────────────────────
@@ -43,11 +40,14 @@ RUN apt-get -o Acquire::Check-Date=false update \
   && rm -rf /var/lib/apt/lists/*
 
 # Only copy the build output and runtime files needed.
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder --chown=node:node /app/public ./public
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 
+USER node
 EXPOSE 3000
-CMD ["npm", "start"]
+ENV HOSTNAME=0.0.0.0
+ENV PORT=3000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "server.js"]

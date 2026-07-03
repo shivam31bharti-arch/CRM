@@ -8,16 +8,24 @@ import { Select } from "@/components/ui/Select";
 
 export function InviteModal({ onInvited }: { onInvited?: () => void }) {
   const [message, setMessage] = useState("");
+  const [temporaryPassword, setTemporaryPassword] = useState("");
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setTemporaryPassword("");
     const form = event.currentTarget;
     const response = await fetch("/api/team", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(Object.fromEntries(new FormData(form)))
     });
-    setMessage(response.ok ? "Teammate added." : "Invite could not be completed.");
+    const body = await response.json().catch(() => ({}));
+    setMessage(
+      response.ok
+        ? "Teammate added. Share the one-time password securely."
+        : (body.error ?? "Invite could not be completed.")
+    );
     if (response.ok) {
+      setTemporaryPassword(body.tempPassword ?? "");
       form.reset();
       onInvited?.();
     }
@@ -47,6 +55,20 @@ export function InviteModal({ onInvited }: { onInvited?: () => void }) {
         </Button>
       </div>
       {message ? <p className="mt-3 text-xs font-medium text-slate-600">{message}</p> : null}
+      {temporaryPassword ? (
+        <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+          <code className="break-all text-xs font-semibold text-amber-950">
+            {temporaryPassword}
+          </code>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => navigator.clipboard.writeText(temporaryPassword)}
+          >
+            Copy
+          </Button>
+        </div>
+      ) : null}
     </form>
   );
 }

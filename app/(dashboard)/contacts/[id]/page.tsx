@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, BriefcaseBusiness, Mail, Phone, Target, UserCheck } from "lucide-react";
 import { ActivityTimeline } from "@/components/contacts/ActivityTimeline";
+import { ContactCompanyEditor } from "@/components/contacts/ContactCompanyEditor";
 import { TagBadge } from "@/components/contacts/TagBadge";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Avatar } from "@/components/shared/Avatar";
@@ -8,23 +9,29 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { WorkspaceMetrics } from "@/components/shared/WorkspaceMetrics";
 import { Badge } from "@/components/ui/Badge";
 import { Card } from "@/components/ui/Card";
+import { requireUser } from "@/lib/auth";
 import { currency } from "@/lib/utils";
 import { db } from "@/lib/db";
+import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
   const { id } = await params;
   const contact = await db.contact.findUnique({
     where: { id },
     include: {
       tags: true,
+      companyRecord: true,
       deals: true,
       activities: { orderBy: { createdAt: "desc" }, include: { user: { select: { name: true } } } }
     }
   });
-  if (!contact) return <PageHeader title="Contact not found" />;
+  if (!contact) notFound();
   const name = contact.firstName + " " + contact.lastName;
+  const canEdit =
+    user.role !== "MEMBER" || contact.createdById === user.id || contact.assignedToId === user.id;
   const pipeline = contact.deals
     .filter((deal) => !["CLOSED_WON", "CLOSED_LOST"].includes(deal.stage))
     .reduce((sum, deal) => sum + deal.value, 0);
@@ -34,7 +41,9 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
         eyebrow="Customer record"
         title={name}
         description={
-          [contact.jobTitle, contact.company].filter(Boolean).join(" at ") || "Individual contact"
+          [contact.jobTitle, contact.companyRecord?.name ?? contact.company]
+            .filter(Boolean)
+            .join(" at ") || "Individual contact"
         }
         actions={
           <div className="flex gap-2">
@@ -120,7 +129,18 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
               </div>
               <div>
                 <dt className="text-xs font-semibold uppercase text-slate-400">Company</dt>
-                <dd className="mt-1 text-slate-700">{contact.company ?? "Independent"}</dd>
+                <dd className="mt-1 text-slate-700">
+                  {contact.companyRecord ? (
+                    <Link
+                      href={`/companies/${contact.companyRecord.id}`}
+                      className="font-medium hover:text-primary"
+                    >
+                      {contact.companyRecord.name}
+                    </Link>
+                  ) : (
+                    (contact.company ?? "Independent")
+                  )}
+                </dd>
               </div>
             </dl>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -129,6 +149,24 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
               ))}
             </div>
           </Card>
+          {canEdit ? (
+            <ContactCompanyEditor
+              contactId={contact.id}
+              company={
+                contact.companyRecord
+                  ? { id: contact.companyRecord.id, name: contact.companyRecord.name }
+                  : null
+              }
+            />
+          ) : (
+            <Card>
+              <h2 className="text-sm font-semibold text-slate-950">Company association</h2>
+              <p className="mt-1 text-xs text-slate-500">
+                Only this contact&apos;s owner, creator, or a workspace manager can change its
+                company.
+              </p>
+            </Card>
+          )}
           <Card>
             <h2 className="text-sm font-semibold text-slate-950">Associated deals</h2>
             <div className="mt-3 space-y-2">

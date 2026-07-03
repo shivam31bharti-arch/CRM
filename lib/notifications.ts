@@ -1,7 +1,6 @@
-// Notification helper shared by routes that need database and realtime fanout.
+// Notification helper shared by routes that persist in-app notifications.
 import type { NotificationType } from "@prisma/client";
 import { db } from "@/lib/db";
-import { publishEvent } from "@/lib/pusher";
 
 export async function createNotification({
   userId,
@@ -16,7 +15,5 @@ export async function createNotification({
   body: string;
   link?: string;
 }) {
-  const notification = await db.notification.create({ data: { userId, type, title, body, link } });
-  await publishEvent(`private-user-${userId}`, "notification.created", { notification });
-  return notification;
+  return db.notification.create({ data: { userId, type, title, body, link } });
 }

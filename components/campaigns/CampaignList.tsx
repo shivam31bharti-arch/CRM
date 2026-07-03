@@ -7,6 +7,7 @@ import { ArrowUpRight, CircleDollarSign, Megaphone, Send, Users } from "lucide-r
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { WorkspaceMetrics } from "@/components/shared/WorkspaceMetrics";
+import { apiJson } from "@/lib/client-api";
 import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
@@ -31,7 +32,7 @@ export function CampaignList() {
   const [status, setStatus] = useState("ALL");
   const { data, isLoading } = useQuery({
     queryKey: ["campaigns"],
-    queryFn: async () => (await fetch("/api/campaigns")).json()
+    queryFn: () => apiJson<{ items: CampaignRow[] }>("/api/campaigns")
   });
   const campaigns: CampaignRow[] = data?.items ?? EMPTY_CAMPAIGNS;
   const visible = campaigns.filter(

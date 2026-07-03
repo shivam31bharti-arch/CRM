@@ -4,7 +4,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 
 const ALGORITHM = "aes-256-gcm";
 const KEY_BYTES = 32; // 256-bit key
-const IV_BYTES = 12;  // 96-bit IV — recommended for GCM
+const IV_BYTES = 12; // 96-bit IV — recommended for GCM
 const TAG_BYTES = 16; // 128-bit auth tag
 
 function getKey(): Buffer {
@@ -33,9 +33,9 @@ export function encryptToken(plain: string): string {
   const encrypted = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
   return (
-    iv.toString("hex") +       // 24 hex chars
-    tag.toString("hex") +      // 32 hex chars
-    encrypted.toString("hex")  // variable
+    iv.toString("hex") + // 24 hex chars
+    tag.toString("hex") + // 32 hex chars
+    encrypted.toString("hex") // variable
   );
 }
 

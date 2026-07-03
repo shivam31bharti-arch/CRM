@@ -14,6 +14,8 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 import { platformLimits } from "@/lib/constants";
+import { getPlatformMediaPolicy } from "@/lib/media-storage";
+import { apiJson } from "@/lib/client-api";
 
 type Platform = "TWITTER" | "LINKEDIN" | "INSTAGRAM" | "FACEBOOK";
 type SocialAccount = {
@@ -35,11 +37,13 @@ export function PostComposer() {
     return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
   });
   const [message, setMessage] = useState("");
+  const [mediaBusy, setMediaBusy] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+  const [draftHydrated, setDraftHydrated] = useState(false);
   const queryClient = useQueryClient();
   const accountsQuery = useQuery({
     queryKey: ["social-accounts"],
-    queryFn: async () => (await fetch("/api/social-accounts")).json()
+    queryFn: () => apiJson<{ items: SocialAccount[] }>("/api/social-accounts")
   });
   const accounts: SocialAccount[] = accountsQuery.data?.items ?? EMPTY_ACCOUNTS;
   const platformAccounts = useMemo(
@@ -47,6 +51,7 @@ export function PostComposer() {
     [accounts, platform]
   );
   const selectedAccount = accounts.find((item) => item.id === accountId) ?? platformAccounts[0];
+  const mediaPolicy = getPlatformMediaPolicy(platform)!;
 
   useEffect(() => {
     if (!platformAccounts.some((item) => item.id === accountId))
@@ -54,6 +59,32 @@ export function PostComposer() {
   }, [accountId, platformAccounts]);
 
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem("post-draft");
+      if (saved) {
+        const draft = JSON.parse(saved) as Partial<{
+          platform: Platform;
+          body: string;
+          mediaUrls: string[];
+          scheduledAt: string;
+          recurringRule: string;
+        }>;
+        if (draft.platform && Object.hasOwn(platformLimits, draft.platform))
+          setPlatform(draft.platform);
+        if (typeof draft.body === "string") setBody(draft.body);
+        if (Array.isArray(draft.mediaUrls)) setMediaUrls(draft.mediaUrls.slice(0, 4));
+        if (typeof draft.scheduledAt === "string") setScheduledAt(draft.scheduledAt);
+        if (typeof draft.recurringRule === "string") setRecurringRule(draft.recurringRule);
+      }
+    } catch {
+      localStorage.removeItem("post-draft");
+    } finally {
+      setDraftHydrated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!draftHydrated) return;
     setDraftSaved(false);
     const timer = window.setTimeout(() => {
       localStorage.setItem(
@@ -63,7 +94,7 @@ export function PostComposer() {
       setDraftSaved(true);
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [platform, body, mediaUrls, scheduledAt, recurringRule]);
+  }, [platform, body, mediaUrls, scheduledAt, recurringRule, draftHydrated]);
 
   async function submit(status: "DRAFT" | "SCHEDULED") {
     setMessage("");
@@ -88,6 +119,7 @@ export function PostComposer() {
     }
     setBody("");
     setMediaUrls([]);
+    localStorage.removeItem("post-draft");
     setMessage(
       status === "SCHEDULED"
         ? "Post added to the publishing queue."
@@ -184,25 +216,34 @@ export function PostComposer() {
           <div className="border-t pt-4">
             <div className="mb-3 flex items-center gap-2">
               <ImageIcon className="h-4 w-4 text-slate-500" aria-hidden="true" />
-              <p className="text-sm font-semibold text-slate-900">Media links</p>
-              <Badge>{mediaUrls.length}/4</Badge>
+              <p className="text-sm font-semibold text-slate-900">Media</p>
+              <Badge>
+                {mediaUrls.length}/{mediaPolicy.maxItems}
+              </Badge>
             </div>
-            <MediaUploader urls={mediaUrls} onChange={setMediaUrls} />
+            <MediaUploader
+              platform={platform}
+              urls={mediaUrls}
+              onChange={setMediaUrls}
+              onBusyChange={setMediaBusy}
+            />
           </div>
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-h-5 text-sm font-medium text-slate-600">{message}</div>
+            <div className="min-h-5 text-sm font-medium text-slate-600">
+              {message || "Hobby deployments process the publishing queue once daily."}
+            </div>
             <div className="flex gap-2">
               <Button
                 variant="secondary"
                 onClick={() => submit("DRAFT")}
-                disabled={!body || !selectedAccount}
+                disabled={!body || !selectedAccount || mediaBusy}
               >
                 <Save className="h-4 w-4" aria-hidden="true" />
                 Save draft
               </Button>
               <Button
                 onClick={() => submit("SCHEDULED")}
-                disabled={!body || !selectedAccount || !withinLimit || !scheduledAt}
+                disabled={!body || !selectedAccount || !withinLimit || !scheduledAt || mediaBusy}
               >
                 <Send className="h-4 w-4" aria-hidden="true" />
                 Schedule

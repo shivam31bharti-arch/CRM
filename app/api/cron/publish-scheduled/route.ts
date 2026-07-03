@@ -1,12 +1,20 @@
-// Cron endpoint: publishes all due scheduled posts.
-// Call this from an external scheduler (Vercel Cron, GitHub Actions, docker cron).
-// Secured by a CRON_SECRET bearer token — never expose this URL publicly without it.
+// Publishes due scheduled posts. Hobby runs daily; production moves to hourly.
+import { timingSafeEqual } from "crypto";
 import { authErrorResponse } from "@/lib/auth";
 import { runScheduler } from "@/lib/scheduler";
+import { runGoogleWorkspaceSyncs } from "@/lib/google-workspace/sync";
+
+function matchesSecret(provided: string, expected: string) {
+  const providedBuffer = Buffer.from(provided);
+  const expectedBuffer = Buffer.from(expected);
+  return (
+    providedBuffer.length === expectedBuffer.length &&
+    timingSafeEqual(providedBuffer, expectedBuffer)
+  );
+}
 
 async function handleCron(request: Request) {
   try {
-    // Validate the shared secret so only your cron runner can trigger this.
     const cronSecret = process.env.CRON_SECRET;
     if (!cronSecret) {
       return Response.json({ error: "CRON_SECRET is not configured." }, { status: 503 });
@@ -14,12 +22,16 @@ async function handleCron(request: Request) {
 
     const authHeader = request.headers.get("authorization");
     const provided = authHeader?.replace(/^Bearer\s+/i, "").trim();
-    if (!provided || provided !== cronSecret) {
+    if (!provided || !matchesSecret(provided, cronSecret)) {
       return Response.json({ error: "Unauthorized." }, { status: 401 });
     }
 
-    const result = await runScheduler();
-    return Response.json(result);
+    const publishing = await runScheduler();
+    const googleWorkspace = await runGoogleWorkspaceSyncs().catch((error) => {
+      console.error("[Cron] Google Workspace sync failed:", error);
+      return { processed: 0, succeeded: 0, failed: 1, skipped: 0 };
+    });
+    return Response.json({ ...publishing, googleWorkspace });
   } catch (error) {
     return authErrorResponse(error);
   }
@@ -27,7 +39,4 @@ async function handleCron(request: Request) {
 
 export const GET = handleCron;
 export const POST = handleCron;
-
-// Vercel Cron config — runs every minute if deployed on Vercel.
-// See: https://vercel.com/docs/cron-jobs
 export const dynamic = "force-dynamic";

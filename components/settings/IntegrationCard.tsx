@@ -48,7 +48,7 @@ export function IntegrationCard({
           </span>
           <div>
             <h2 className="font-semibold text-slate-950">{label}</h2>
-            <p className="text-xs text-slate-500">Publishing, analytics, and inbox sync</p>
+            <p className="text-xs text-slate-500">OAuth connection for approved publishing flows</p>
           </div>
         </div>
         <Badge tone={account?.isActive ? "PUBLISHED" : "DRAFT"}>

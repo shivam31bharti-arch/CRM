@@ -15,7 +15,10 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
         contact: true,
         assignedTo: { select: { id: true, name: true, avatarUrl: true } },
         notes: { include: { author: { select: { name: true } } }, orderBy: { createdAt: "desc" } },
-        activities: { include: { user: { select: { name: true } } }, orderBy: { createdAt: "desc" } }
+        activities: {
+          include: { user: { select: { name: true } } },
+          orderBy: { createdAt: "desc" }
+        }
       }
     });
     if (!deal) return jsonError("Deal not found.", 404);
@@ -60,7 +63,10 @@ export async function DELETE(_: Request, { params }: { params: Promise<{ id: str
   try {
     const { id } = await params;
     await requireUser(["ADMIN", "MANAGER"]);
-    await db.deal.delete({ where: { id } });
+    await db.$transaction([
+      db.activity.updateMany({ where: { dealId: id }, data: { dealId: null } }),
+      db.deal.delete({ where: { id } })
+    ]);
     return Response.json({ ok: true });
   } catch (error) {
     return authErrorResponse(error);

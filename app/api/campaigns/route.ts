@@ -8,7 +8,11 @@ export async function GET() {
   try {
     await requireUser();
     const items = await db.campaign.findMany({
-      include: { posts: true, contacts: { include: { contact: true } }, deals: { include: { deal: true } } },
+      include: {
+        posts: true,
+        contacts: { include: { contact: true } },
+        deals: { include: { deal: true } }
+      },
       orderBy: { createdAt: "desc" }
     });
     return Response.json({ items });

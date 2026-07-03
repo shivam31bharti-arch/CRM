@@ -1,6 +1,18 @@
 // CSV contact import API with header validation, size limits, and batch insert.
 import { authErrorResponse, requireUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { lockWorkspaceIdentityWrites, withSerializableTransaction } from "@/lib/db-transaction";
+import {
+  normalizeCompanyKey,
+  normalizeEmail,
+  normalizePhone
+} from "@/lib/domain/contacts/identity";
+import {
+  prepareContactImportRows,
+  readTextBodyWithLimit,
+  RequestBodyTooLargeError
+} from "@/lib/domain/contacts/import";
+import { contactImportRowSchema } from "@/lib/validations/contacts";
+import { parse } from "csv-parse/sync";
 
 // [C-3] Hard limits prevent memory exhaustion and DB connection flooding.
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -22,51 +34,145 @@ export async function POST(request: Request) {
       return Response.json({ errors: [`File exceeds the 5 MB limit.`] }, { status: 413 });
     }
 
-    const text = await request.text();
-    if (Buffer.byteLength(text, "utf8") > MAX_BYTES) {
-      return Response.json({ errors: ["File exceeds the 5 MB limit."] }, { status: 413 });
+    let text: string;
+    try {
+      text = await readTextBodyWithLimit(request.body, MAX_BYTES);
+    } catch (error) {
+      if (error instanceof RequestBodyTooLargeError) {
+        return Response.json({ errors: ["File exceeds the 5 MB limit."] }, { status: 413 });
+      }
+      throw error;
     }
 
-    const [headerLine, ...lines] = text.trim().split(/\r?\n/);
-    const headers = headerLine?.split(",").map((h) => h.trim()) ?? [];
-    const required = ["firstName", "lastName"];
-    const missing = required.filter((name) => !headers.includes(name));
-    if (missing.length) return Response.json({ errors: [`Missing headers: ${missing.join(", ")}`] }, { status: 422 });
+    let rows: Array<Record<string, string>>;
+    try {
+      rows = parse(text, {
+        bom: true,
+        columns: (headers: string[]) => {
+          const normalized = headers.map((header) => header.trim());
+          const missing = ["firstName", "lastName"].filter((name) => !normalized.includes(name));
+          if (missing.length) throw new Error(`Missing headers: ${missing.join(", ")}`);
+          return normalized;
+        },
+        skip_empty_lines: true,
+        trim: true,
+        max_record_size: MAX_BYTES
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "CSV could not be parsed.";
+      return Response.json({ errors: [message] }, { status: 422 });
+    }
 
-    // [C-3] Cap row count to prevent runaway imports.
-    const dataLines = lines.slice(0, MAX_ROWS + 1);
-    if (dataLines.length > MAX_ROWS) {
-      return Response.json({ errors: [`Import exceeds the ${MAX_ROWS.toLocaleString()} row limit.`] }, { status: 422 });
+    if (rows.length > MAX_ROWS) {
+      return Response.json(
+        { errors: [`Import exceeds the ${MAX_ROWS.toLocaleString()} row limit.`] },
+        { status: 422 }
+      );
     }
 
     const errors: string[] = [];
-    const batch: Array<{ firstName: string; lastName: string; email: string | null; company: string | null; createdById: string }> = [];
+    const validRows: Array<{
+      rowNumber: number;
+      firstName: string;
+      lastName: string;
+      email?: string;
+      phone?: string;
+      company?: string;
+    }> = [];
 
-    for (const [index, line] of dataLines.entries()) {
-      if (!line.trim()) continue; // skip blank lines
-      const values = line.split(",").map((v) => v.trim());
-      const row = Object.fromEntries(headers.map((header, i) => [header, values[i] ?? ""]));
-      if (!row.firstName || !row.lastName) {
-        errors.push(`Row ${index + 2}: firstName and lastName are required.`);
+    for (const [index, row] of rows.entries()) {
+      const parsedRow = contactImportRowSchema.safeParse(row);
+      if (!parsedRow.success) {
+        errors.push(
+          `Row ${index + 2}: ${parsedRow.error.issues[0]?.message ?? "Invalid contact."}`
+        );
         continue;
       }
-      batch.push({
-        firstName: row.firstName,
-        lastName: row.lastName,
-        email: row.email || null,
-        company: row.company || null,
-        createdById: user.id
+      validRows.push({
+        rowNumber: index + 2,
+        firstName: parsedRow.data.firstName,
+        lastName: parsedRow.data.lastName,
+        email: parsedRow.data.email,
+        phone: parsedRow.data.phone,
+        company: parsedRow.data.company
       });
     }
 
-    // [C-3] Single createMany call instead of N sequential inserts.
-    let created = 0;
-    if (batch.length > 0) {
-      const result = await db.contact.createMany({ data: batch, skipDuplicates: false });
-      created = result.count;
-    }
+    const emailIdentities = [
+      ...new Set(validRows.map((row) => normalizeEmail(row.email)).filter(Boolean))
+    ] as string[];
+    const phoneIdentities = [
+      ...new Set(validRows.map((row) => normalizePhone(row.phone)).filter(Boolean))
+    ] as string[];
+    const result = await withSerializableTransaction(async (transaction) => {
+      await lockWorkspaceIdentityWrites(transaction);
+      const existingIdentities =
+        emailIdentities.length || phoneIdentities.length
+          ? await transaction.contact.findMany({
+              where: {
+                status: { not: "ARCHIVED" },
+                OR: [
+                  ...(emailIdentities.length ? [{ emailNormalized: { in: emailIdentities } }] : []),
+                  ...(phoneIdentities.length ? [{ phoneNormalized: { in: phoneIdentities } }] : [])
+                ]
+              },
+              select: { id: true, emailNormalized: true, phoneNormalized: true }
+            })
+          : [];
+      const prepared = prepareContactImportRows(validRows, existingIdentities);
 
-    return Response.json({ created, errors });
+      const companyNames = new Map<string, string>();
+      for (const row of prepared.accepted) {
+        const key = normalizeCompanyKey(row.company);
+        if (key && row.company && !companyNames.has(key)) companyNames.set(key, row.company);
+      }
+
+      if (companyNames.size) {
+        const keys = [...companyNames.keys()];
+        const existingCompanies = await transaction.company.findMany({
+          where: { normalizedName: { in: keys } },
+          select: { id: true, normalizedName: true, archivedAt: true }
+        });
+        const archivedIds = existingCompanies
+          .filter((company) => company.archivedAt !== null)
+          .map((company) => company.id);
+        if (archivedIds.length) {
+          await transaction.company.updateMany({
+            where: { id: { in: archivedIds } },
+            data: { archivedAt: null }
+          });
+        }
+        const existingKeys = new Set(existingCompanies.map((company) => company.normalizedName));
+        const missingCompanies = [...companyNames]
+          .filter(([normalizedName]) => !existingKeys.has(normalizedName))
+          .map(([normalizedName, name]) => ({ name, normalizedName, ownerId: user.id }));
+        if (missingCompanies.length) {
+          await transaction.company.createMany({ data: missingCompanies, skipDuplicates: true });
+        }
+      }
+
+      const companies = companyNames.size
+        ? await transaction.company.findMany({
+            where: { normalizedName: { in: [...companyNames.keys()] }, archivedAt: null },
+            select: { id: true, normalizedName: true }
+          })
+        : [];
+      const companyIdByKey = new Map(
+        companies.map((company) => [company.normalizedName, company.id])
+      );
+      const batch = prepared.accepted.map(({ rowNumber: _, ...row }) => ({
+        ...row,
+        companyId: companyIdByKey.get(normalizeCompanyKey(row.company) ?? "") ?? null,
+        createdById: user.id
+      }));
+
+      const created = batch.length
+        ? (await transaction.contact.createMany({ data: batch, skipDuplicates: false })).count
+        : 0;
+      return { created, duplicates: prepared.duplicates };
+    });
+
+    return Response.json({ created: result.created, errors, duplicates: result.duplicates });
   } catch (error) {
     return authErrorResponse(error);
   }

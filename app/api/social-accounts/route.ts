@@ -3,28 +3,16 @@ import { Platform } from "@prisma/client";
 import { authErrorResponse, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { encryptToken } from "@/lib/crypto";
+import { safeSocialAccountSelect } from "@/lib/selects";
 import { jsonError } from "@/lib/utils";
 
 // [H-5] Explicit select — never expose accessToken or refreshToken to the client.
-const safeSelect = {
-  id: true,
-  platform: true,
-  accountName: true,
-  accountId: true,
-  avatarUrl: true,
-  followerCount: true,
-  isActive: true,
-  createdAt: true,
-  updatedAt: true,
-  tokenExpiry: true
-} as const;
-
 export async function GET() {
   try {
     const user = await requireUser();
     const items = await db.socialAccount.findMany({
       where: { userId: user.id },
-      select: safeSelect,
+      select: safeSocialAccountSelect,
       orderBy: { createdAt: "desc" }
     });
     return Response.json({ items });
@@ -41,7 +29,8 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as { platform?: Platform; accountName?: string };
-    if (!body.platform || !body.accountName) return jsonError("Platform and account name are required.", 422);
+    if (!body.platform || !body.accountName)
+      return jsonError("Platform and account name are required.", 422);
 
     // [C-2] Encrypt the access token before persisting to the database.
     const item = await db.socialAccount.create({
@@ -53,7 +42,7 @@ export async function POST(request: Request) {
         userId: user.id,
         followerCount: 1200
       },
-      select: safeSelect
+      select: safeSocialAccountSelect
     });
     return Response.json(item, { status: 201 });
   } catch (error) {

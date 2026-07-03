@@ -1,6 +1,8 @@
-CRM
+# Kai & Co. Internal CRM
 
-Internal CRM backbone for contact management, opportunity tracking, campaigns, social publishing, analytics, and team operations.
+![Dashboard Snapshot](./public/dashboard-screenshot.png)
+
+A modern, full-stack Internal CRM backbone built for contact management, opportunity tracking, marketing campaigns, automated social publishing, analytics, and streamlined team operations.
 
 ## Current scope
 
@@ -13,6 +15,7 @@ Implemented today:
 - encrypted social OAuth credentials and guarded publishing adapters;
 - scheduled and recurring publishing with duplicate-delivery protection;
 - analytics views backed by stored snapshots.
+- one-account-per-user Google Workspace sync for Gmail metadata and primary owned calendars.
 
 Not presented as active features yet: billing, public API keys, outbound webhooks, realtime subscriptions, social inbox replies, and automated analytics/inbox ingestion.
 
@@ -47,9 +50,11 @@ openssl rand -hex 32    # ENCRYPTION_KEY
 
 See `.env.example` for database and OAuth variables. OAuth access and refresh tokens are encrypted with AES-256-GCM and are never selected into browser-facing API responses.
 
+For Google Workspace, enable the Gmail and Google Calendar APIs, configure the exact callback URI from `GOOGLE_REDIRECT_URI`, and request only the scopes listed in `.env.example`. Gmail message bodies, snippets, and attachments are not stored. The `gmail.metadata` scope is restricted, so a public external app may require Google verification before production rollout.
+
 ## Scheduling
 
-`vercel.json` intentionally uses one daily UTC publishing run for the current Vercel Hobby deployment. After upgrading the production plan, change the schedule to hourly:
+`vercel.json` intentionally uses one daily UTC publishing and Google Workspace sync run for the current Vercel Hobby deployment. After upgrading the production plan, change the schedule to hourly:
 
 ```json
 "schedule": "0 * * * *"

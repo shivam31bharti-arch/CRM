@@ -35,7 +35,8 @@ export function csvEscape(value: unknown) {
 export function toCsv(rows: Array<Record<string, unknown>>) {
   if (rows.length === 0) return "";
   const headers = Object.keys(rows[0]);
-  return [headers.join(","), ...rows.map((row) => headers.map((h) => csvEscape(row[h])).join(","))].join(
-    "\n"
-  );
+  return [
+    headers.join(","),
+    ...rows.map((row) => headers.map((h) => csvEscape(row[h])).join(","))
+  ].join("\n");
 }

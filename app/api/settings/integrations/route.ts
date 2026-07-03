@@ -2,12 +2,16 @@
 import { Platform } from "@prisma/client";
 import { authErrorResponse, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { safeSocialAccountSelect } from "@/lib/selects";
 import { jsonError } from "@/lib/utils";
 
 export async function GET() {
   try {
     const user = await requireUser();
-    const accounts = await db.socialAccount.findMany({ where: { userId: user.id } });
+    const accounts = await db.socialAccount.findMany({
+      where: { userId: user.id },
+      select: safeSocialAccountSelect
+    });
     return Response.json({
       platforms: Object.values(Platform).map((platform) => ({
         platform,
@@ -23,10 +27,11 @@ export async function PATCH(request: Request) {
   try {
     const user = await requireUser();
     const body = (await request.json()) as { platform?: Platform; isActive?: boolean };
-    if (!body.platform || typeof body.isActive !== "boolean") return jsonError("Platform and active state are required.", 422);
+    if (!body.platform || typeof body.isActive !== "boolean")
+      return jsonError("Platform and active state are required.", 422);
     const result = await db.socialAccount.updateMany({
       where: { userId: user.id, platform: body.platform },
-      data: { isActive: body.isActive, accessToken: body.isActive ? undefined : "revoked" }
+      data: { isActive: body.isActive }
     });
     return Response.json({ updated: result.count });
   } catch (error) {

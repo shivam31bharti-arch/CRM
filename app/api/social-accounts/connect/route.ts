@@ -7,6 +7,7 @@ import { NextRequest } from "next/server";
 import { authErrorResponse, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { encryptToken } from "@/lib/crypto";
+import { readMetaGraphApiVersion } from "@/lib/social/meta-config";
 import { jsonError } from "@/lib/utils";
 
 function platformConfig(platform: Platform, baseUrl: string) {
@@ -30,18 +31,20 @@ function platformConfig(platform: Platform, baseUrl: string) {
         redirectUri: `${baseUrl}/api/social-accounts/connect?platform=LINKEDIN`
       };
     case Platform.FACEBOOK:
+      const facebookGraphVersion = readMetaGraphApiVersion();
       return {
-        authUrl: "https://www.facebook.com/v19.0/dialog/oauth",
-        tokenUrl: "https://graph.facebook.com/v19.0/oauth/access_token",
+        authUrl: `https://www.facebook.com/${facebookGraphVersion}/dialog/oauth`,
+        tokenUrl: `https://graph.facebook.com/${facebookGraphVersion}/oauth/access_token`,
         clientId: process.env.FACEBOOK_APP_ID ?? "",
         clientSecret: process.env.FACEBOOK_APP_SECRET ?? "",
         scope: "pages_manage_posts,pages_read_engagement",
         redirectUri: `${baseUrl}/api/social-accounts/connect?platform=FACEBOOK`
       };
     case Platform.INSTAGRAM:
+      const instagramGraphVersion = readMetaGraphApiVersion();
       return {
-        authUrl: "https://www.facebook.com/v19.0/dialog/oauth",
-        tokenUrl: "https://graph.facebook.com/v19.0/oauth/access_token",
+        authUrl: `https://www.facebook.com/${instagramGraphVersion}/dialog/oauth`,
+        tokenUrl: `https://graph.facebook.com/${instagramGraphVersion}/oauth/access_token`,
         clientId: process.env.FACEBOOK_APP_ID ?? "",
         clientSecret: process.env.FACEBOOK_APP_SECRET ?? "",
         scope: "instagram_basic,instagram_content_publish,pages_read_engagement",
@@ -82,12 +85,18 @@ export async function GET(request: NextRequest) {
     const secureCookies = baseUrl.startsWith("https://");
 
     if (!platform || !Object.values(Platform).includes(platform)) {
-      return jsonError("platform query parameter is required (TWITTER|LINKEDIN|FACEBOOK|INSTAGRAM).", 422);
+      return jsonError(
+        "platform query parameter is required (TWITTER|LINKEDIN|FACEBOOK|INSTAGRAM).",
+        422
+      );
     }
 
     const cfg = platformConfig(platform, baseUrl);
     if (!cfg.clientId || !cfg.clientSecret) {
-      return jsonError(`${platform} OAuth is not configured. Add the required env vars (see .env.example).`, 503);
+      return jsonError(
+        `${platform} OAuth is not configured. Add the required env vars (see .env.example).`,
+        503
+      );
     }
 
     if (code && !state) return jsonError("OAuth state is missing.", 400);
@@ -119,7 +128,9 @@ export async function GET(request: NextRequest) {
           "Content-Type": "application/x-www-form-urlencoded",
           Accept: "application/json",
           ...(platform === Platform.TWITTER
-            ? { Authorization: `Basic ${Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString("base64")}` }
+            ? {
+                Authorization: `Basic ${Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`).toString("base64")}`
+              }
             : {})
         },
         body: new URLSearchParams(tokenParams)
@@ -137,9 +148,25 @@ export async function GET(request: NextRequest) {
         token_type?: string;
       };
 
-      const { accountId, accountName, accessToken } = await fetchAccountInfo(platform, tokenData.access_token);
+      const { accountId, accountName, accessToken } = await fetchAccountInfo(
+        platform,
+        tokenData.access_token
+      );
       const storedAccessToken = accessToken ?? tokenData.access_token;
-      const tokenExpiry = tokenData.expires_in ? new Date(Date.now() + tokenData.expires_in * 1000) : null;
+      const tokenExpiry = tokenData.expires_in
+        ? new Date(Date.now() + tokenData.expires_in * 1000)
+        : null;
+
+      const connectedAccount = await db.socialAccount.findUnique({
+        where: { platform_accountId: { platform, accountId } },
+        select: { userId: true }
+      });
+      if (connectedAccount && connectedAccount.userId !== user.id) {
+        return jsonError(
+          "This social account is already connected to another workspace member.",
+          409
+        );
+      }
 
       await db.socialAccount.upsert({
         where: { platform_accountId: { platform, accountId } },
@@ -163,9 +190,15 @@ export async function GET(request: NextRequest) {
         }
       });
 
-      const redirect = Response.redirect(`${baseUrl}/settings?connected=${platform.toLowerCase()}`, 302);
+      const redirect = Response.redirect(
+        `${baseUrl}/settings?connected=${platform.toLowerCase()}`,
+        302
+      );
       redirect.headers.append("Set-Cookie", clearCookie(stateCookieName, secureCookies));
-      redirect.headers.append("Set-Cookie", clearCookie(cookieName("pkce_verifier", platform), secureCookies));
+      redirect.headers.append(
+        "Set-Cookie",
+        clearCookie(cookieName("pkce_verifier", platform), secureCookies)
+      );
       return redirect;
     }
 
@@ -222,19 +255,23 @@ async function fetchAccountInfo(platform: Platform, accessToken: string): Promis
     }
 
     case Platform.FACEBOOK: {
-      const res = await fetch("https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token", {
+      const graphApi = `https://graph.facebook.com/${readMetaGraphApiVersion()}`;
+      const res = await fetch(`${graphApi}/me/accounts?fields=id,name,access_token`, {
         headers: { Authorization: `Bearer ${accessToken}` }
       });
       if (!res.ok) throw new Error("Failed to fetch Facebook Pages.");
-      const data = (await res.json()) as { data: Array<{ id: string; name: string; access_token?: string }> };
+      const data = (await res.json()) as {
+        data: Array<{ id: string; name: string; access_token?: string }>;
+      };
       const page = data.data[0];
       if (!page) throw new Error("No Facebook Pages found. Please create a Facebook Page first.");
       return { accountId: page.id, accountName: page.name, accessToken: page.access_token };
     }
 
     case Platform.INSTAGRAM: {
+      const graphApi = `https://graph.facebook.com/${readMetaGraphApiVersion()}`;
       const pagesRes = await fetch(
-        "https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,instagram_business_account{id,name,username}",
+        `${graphApi}/me/accounts?fields=id,name,access_token,instagram_business_account{id,name,username}`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       if (!pagesRes.ok) throw new Error("Failed to fetch Instagram account.");
@@ -247,9 +284,15 @@ async function fetchAccountInfo(platform: Platform, accessToken: string): Promis
       const page = pagesData.data.find((item) => item.instagram_business_account);
       const igAccount = page?.instagram_business_account;
       if (!igAccount) {
-        throw new Error("No Instagram Business/Creator account found. Link your Instagram account to a Facebook Page first.");
+        throw new Error(
+          "No Instagram Business/Creator account found. Link your Instagram account to a Facebook Page first."
+        );
       }
-      return { accountId: igAccount.id, accountName: `@${igAccount.username}`, accessToken: page?.access_token };
+      return {
+        accountId: igAccount.id,
+        accountName: `@${igAccount.username}`,
+        accessToken: page?.access_token
+      };
     }
   }
 }

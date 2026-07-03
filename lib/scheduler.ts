@@ -18,10 +18,27 @@ export interface SchedulerResult {
  * Runs atomically per-post — one failure does not block others.
  */
 export async function runScheduler(): Promise<SchedulerResult> {
+  const now = new Date();
+  const staleProcessingCutoff = new Date(now.getTime() - 15 * 60 * 1000);
+
+  // Never retry an interrupted external publish automatically: the provider may
+  // have accepted it before the function stopped, so retrying could duplicate it.
+  await db.post.updateMany({
+    where: {
+      status: PostStatus.PROCESSING,
+      processingStartedAt: { lt: staleProcessingCutoff }
+    },
+    data: {
+      status: PostStatus.FAILED,
+      processingStartedAt: null,
+      errorMessage: "Publishing was interrupted. Verify the provider before retrying."
+    }
+  });
+
   const duePosts = await db.post.findMany({
     where: {
       status: PostStatus.SCHEDULED,
-      scheduledAt: { lte: new Date() }
+      scheduledAt: { lte: now }
     },
     include: { socialAccount: true },
     orderBy: { scheduledAt: "asc" },
@@ -30,13 +47,26 @@ export async function runScheduler(): Promise<SchedulerResult> {
   });
 
   const result: SchedulerResult = {
-    processed: duePosts.length,
+    processed: 0,
     succeeded: [],
     failed: []
   };
 
   for (const post of duePosts) {
+    const claim = await db.post.updateMany({
+      where: { id: post.id, status: PostStatus.SCHEDULED },
+      data: { status: PostStatus.PROCESSING, processingStartedAt: new Date() }
+    });
+    if (claim.count === 0) continue;
+    result.processed += 1;
+
     try {
+      if (!post.socialAccount.isActive) {
+        throw new Error("Social account is inactive. Reconnect it before retrying.");
+      }
+      if (post.socialAccount.tokenExpiry && post.socialAccount.tokenExpiry <= new Date()) {
+        throw new Error("Social account token expired. Reconnect it before retrying.");
+      }
       // Decrypt the stored OAuth access token for this platform account.
       const accessToken = decryptToken(post.socialAccount.accessToken);
       const refreshToken = post.socialAccount.refreshToken
@@ -58,6 +88,7 @@ export async function runScheduler(): Promise<SchedulerResult> {
         where: { id: post.id },
         data: {
           status: PostStatus.PUBLISHED,
+          processingStartedAt: null,
           publishedAt: new Date(),
           externalPostId: externalId,
           errorMessage: null,
@@ -67,36 +98,38 @@ export async function runScheduler(): Promise<SchedulerResult> {
         }
       });
 
-      // Notify the post author.
+      result.succeeded.push(post.id);
+
+      // Notification delivery should never change an already-published post to FAILED.
       await createNotification({
         userId: post.authorId,
         type: "POST_PUBLISHED",
         title: "Post published",
         body: `Your ${post.platform} post was published successfully.`,
         link: `/scheduler`
-      });
+      }).catch((error) => console.error("[Scheduler] Notification failed:", error));
 
       // If recurring, schedule the next occurrence.
       if (post.isRecurring && post.recurringRule) {
         const { nextRecurringDate } = await import("@/lib/validations/posts");
         const nextDate = nextRecurringDate(post.recurringRule, post.scheduledAt ?? new Date());
-        await db.post.create({
-          data: {
-            body: post.body,
-            mediaUrls: post.mediaUrls,
-            platform: post.platform,
-            status: PostStatus.SCHEDULED,
-            scheduledAt: nextDate,
-            isRecurring: post.isRecurring,
-            recurringRule: post.recurringRule,
-            authorId: post.authorId,
-            socialAccountId: post.socialAccountId,
-            campaignId: post.campaignId
-          }
-        });
+        await db.post
+          .create({
+            data: {
+              body: post.body,
+              mediaUrls: post.mediaUrls,
+              platform: post.platform,
+              status: PostStatus.SCHEDULED,
+              scheduledAt: nextDate,
+              isRecurring: post.isRecurring,
+              recurringRule: post.recurringRule,
+              authorId: post.authorId,
+              socialAccountId: post.socialAccountId,
+              campaignId: post.campaignId
+            }
+          })
+          .catch((error) => console.error("[Scheduler] Recurrence creation failed:", error));
       }
-
-      result.succeeded.push(post.id);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       console.error(`[Scheduler] Failed to publish post ${post.id}:`, errorMessage);
@@ -104,7 +137,7 @@ export async function runScheduler(): Promise<SchedulerResult> {
       // Mark post as FAILED and record the error.
       await db.post.update({
         where: { id: post.id },
-        data: { status: PostStatus.FAILED, errorMessage }
+        data: { status: PostStatus.FAILED, processingStartedAt: null, errorMessage }
       });
 
       // Notify the author about the failure.
@@ -114,7 +147,7 @@ export async function runScheduler(): Promise<SchedulerResult> {
         title: "Post failed to publish",
         body: `Your ${post.platform} post could not be published: ${errorMessage}`,
         link: `/scheduler`
-      });
+      }).catch((error) => console.error("[Scheduler] Failure notification failed:", error));
 
       result.failed.push({ id: post.id, error: errorMessage });
     }

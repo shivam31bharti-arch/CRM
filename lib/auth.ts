@@ -10,8 +10,7 @@ import { loginSchema } from "@/lib/validations/auth";
 const authSecret = process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET;
 if (!authSecret) {
   throw new Error(
-    "AUTH_SECRET environment variable is required. " +
-      "Generate one with: openssl rand -base64 32"
+    "AUTH_SECRET environment variable is required. " + "Generate one with: openssl rand -base64 32"
   );
 }
 
@@ -41,8 +40,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       authorize: async (credentials) => {
         const parsed = loginSchema.safeParse(credentials);
         if (!parsed.success) return null;
-        const user = await db.user.findUnique({ where: { email: parsed.data.email.toLowerCase() } });
-        if (!user) return null;
+        const user = await db.user.findUnique({
+          where: { email: parsed.data.email.toLowerCase() }
+        });
+        if (!user || !user.isActive) return null;
         const valid = await verifyPassword(parsed.data.password, user.passwordHash);
         if (!valid) return null;
         await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
@@ -83,7 +84,7 @@ export async function requireUser(roles?: Role[]) {
   const id = session?.user?.id;
   if (!id) throw new ApiAuthError("Authentication required.", 401);
   const user = await db.user.findUnique({ where: { id } });
-  if (!user) throw new ApiAuthError("Authentication required.", 401);
+  if (!user || !user.isActive) throw new ApiAuthError("Authentication required.", 401);
   if (roles && !roles.includes(user.role)) throw new ApiAuthError("Insufficient permissions.", 403);
   return user;
 }

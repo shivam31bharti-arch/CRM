@@ -1,5 +1,6 @@
 // Twitter/X publishing adapter using twitter-api-v2 (OAuth 2.0 user context).
 import { TwitterApi } from "twitter-api-v2";
+import { fetchExternalMedia } from "@/lib/safe-media";
 
 export interface TwitterPostResult {
   externalId: string;
@@ -21,9 +22,7 @@ export async function publishTwitterPost(
   if (mediaUrls.length > 0) {
     const uploadedIds = await Promise.all(
       mediaUrls.slice(0, 4).map(async (url) => {
-        const response = await fetch(url);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const mimeType = response.headers.get("content-type") ?? "image/jpeg";
+        const { buffer, mimeType } = await fetchExternalMedia(url);
         return client.v1.uploadMedia(buffer, { mimeType });
       })
     );
@@ -31,7 +30,11 @@ export async function publishTwitterPost(
   }
 
   // twitter-api-v2 expects media_ids as a 1–4 element tuple.
-  type MediaIds = [string] | [string, string] | [string, string, string] | [string, string, string, string];
+  type MediaIds =
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string];
 
   const tweetPayload: Parameters<typeof client.v2.tweet>[0] = { text: body };
   if (mediaIds && mediaIds.length > 0) {

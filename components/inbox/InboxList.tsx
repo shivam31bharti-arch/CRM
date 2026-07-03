@@ -8,6 +8,7 @@ import { PlatformFilter } from "@/components/inbox/PlatformFilter";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { WorkspaceMetrics } from "@/components/shared/WorkspaceMetrics";
+import { apiJson } from "@/lib/client-api";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
@@ -25,7 +26,7 @@ export function InboxList() {
   }, [platform, read]);
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["inbox", query],
-    queryFn: async () => (await fetch(`/api/inbox?${query}`)).json()
+    queryFn: () => apiJson<{ items: InboxRow[]; unreadCount: number }>(`/api/inbox?${query}`)
   });
   const items: InboxRow[] = data?.items ?? EMPTY_MESSAGES;
   const visibleItems = items.filter((item) =>

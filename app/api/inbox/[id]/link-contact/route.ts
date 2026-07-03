@@ -7,10 +7,18 @@ import { jsonError } from "@/lib/utils";
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    await requireUser();
+    const user = await requireUser();
     const parsed = linkContactSchema.safeParse(await request.json());
     if (!parsed.success) return jsonError("Contact id is required.", 422);
-    const item = await db.inboxItem.update({ where: { id }, data: { contactId: parsed.data.contactId } });
+    const existing = await db.inboxItem.findFirst({
+      where: { id, socialAccount: { userId: user.id } },
+      select: { id: true }
+    });
+    if (!existing) return jsonError("Inbox item not found.", 404);
+    const item = await db.inboxItem.update({
+      where: { id },
+      data: { contactId: parsed.data.contactId }
+    });
     return Response.json(item);
   } catch (error) {
     return authErrorResponse(error);

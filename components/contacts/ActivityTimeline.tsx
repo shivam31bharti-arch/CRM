@@ -1,7 +1,13 @@
 // Reverse-chronological activity timeline for contacts and deals.
 import { formatDistanceToNow } from "date-fns";
 
-type Activity = { id: string; description: string; type: string; createdAt: string; user?: { name?: string | null } };
+type Activity = {
+  id: string;
+  description: string;
+  type: string;
+  createdAt: string;
+  user?: { name?: string | null };
+};
 
 export function ActivityTimeline({ activities = [] }: { activities?: Activity[] }) {
   return (

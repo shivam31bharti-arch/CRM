@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
-import { Check, ChevronDown, Link2, Reply } from "lucide-react";
+import { Check, Link2 } from "lucide-react";
 import { ContactLinker } from "@/components/inbox/ContactLinker";
-import { ReplyComposer } from "@/components/inbox/ReplyComposer";
 import { Avatar } from "@/components/shared/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -24,8 +22,6 @@ export type InboxRow = {
 };
 
 export function InboxItem({ item, onChanged }: { item: InboxRow; onChanged?: () => void }) {
-  const [expanded, setExpanded] = useState(false);
-
   async function markRead() {
     await fetch(`/api/inbox/${item.id}`, {
       method: "PATCH",
@@ -58,14 +54,6 @@ export function InboxItem({ item, onChanged }: { item: InboxRow; onChanged?: () 
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-700">{item.body}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button variant="secondary" onClick={() => setExpanded((value) => !value)}>
-              <Reply className="h-4 w-4" aria-hidden="true" />
-              {item.isReplied ? "Reply again" : "Reply"}
-              <ChevronDown
-                className={cn("h-4 w-4 transition", expanded && "rotate-180")}
-                aria-hidden="true"
-              />
-            </Button>
             {!item.isRead ? (
               <Button variant="ghost" onClick={markRead}>
                 <Check className="h-4 w-4" aria-hidden="true" />
@@ -79,20 +67,14 @@ export function InboxItem({ item, onChanged }: { item: InboxRow; onChanged?: () 
               </span>
             ) : null}
           </div>
+          {!item.contact ? (
+            <div className="mt-3 border-t pt-3">
+              <p className="text-xs font-semibold uppercase text-slate-500">Link relationship</p>
+              <ContactLinker id={item.id} onLinked={onChanged} />
+            </div>
+          ) : null}
         </div>
       </div>
-      {expanded ? (
-        <div className="grid gap-4 border-t bg-slate-50/70 p-4 lg:grid-cols-2">
-          <div>
-            <p className="text-xs font-semibold uppercase text-slate-500">Send response</p>
-            <ReplyComposer id={item.id} onSent={onChanged} />
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase text-slate-500">Link relationship</p>
-            <ContactLinker id={item.id} onLinked={onChanged} />
-          </div>
-        </div>
-      ) : null}
     </article>
   );
 }

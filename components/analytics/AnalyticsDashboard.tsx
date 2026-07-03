@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Select } from "@/components/ui/Select";
 import { cn } from "@/lib/utils";
+import { apiJson } from "@/lib/client-api";
 
 type Period = 7 | 30 | 90;
 type Metric = "reach" | "impressions" | "engagement";
@@ -90,13 +91,13 @@ export function AnalyticsDashboard() {
 
   const overviewQuery = useQuery<AnalyticsOverview>({
     queryKey: ["analytics-overview", period],
-    queryFn: async () =>
-      (await fetch(`/api/analytics/overview?from=${encodeURIComponent(from)}`)).json()
+    queryFn: () =>
+      apiJson<AnalyticsOverview>(`/api/analytics/overview?from=${encodeURIComponent(from)}`)
   });
   const postsQuery = useQuery<{ items: PerformanceRow[] }>({
     queryKey: ["analytics-posts", period],
-    queryFn: async () =>
-      (await fetch(`/api/analytics/posts?from=${encodeURIComponent(from)}`)).json()
+    queryFn: () =>
+      apiJson<{ items: PerformanceRow[] }>(`/api/analytics/posts?from=${encodeURIComponent(from)}`)
   });
 
   const allRows = postsQuery.data?.items ?? EMPTY_ROWS;

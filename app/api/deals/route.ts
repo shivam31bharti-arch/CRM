@@ -1,4 +1,5 @@
 // Deal collection API for list and create — with pagination.
+import { DealStage } from "@prisma/client";
 import { authErrorResponse, requireUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { dealSchema } from "@/lib/validations/deals";
@@ -12,14 +13,22 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const page = Math.max(1, Number(params.get("page") ?? 1));
     const pageSize = Math.min(100, Math.max(1, Number(params.get("pageSize") ?? 25)));
-    const stage = params.get("stage") ?? undefined;
+    const stageParam = params.get("stage");
+    const stage =
+      stageParam && Object.values(DealStage).includes(stageParam as DealStage)
+        ? (stageParam as DealStage)
+        : undefined;
+    if (stageParam && !stage) return jsonError("Unsupported deal stage.", 422);
 
-    const where = stage ? { stage: stage as never } : {};
+    const where = stage ? { stage } : {};
 
     const [items, total] = await Promise.all([
       db.deal.findMany({
         where,
-        include: { contact: true, assignedTo: { select: { id: true, name: true, avatarUrl: true } } },
+        include: {
+          contact: true,
+          assignedTo: { select: { id: true, name: true, avatarUrl: true } }
+        },
         orderBy: { updatedAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize
@@ -42,7 +51,9 @@ export async function POST(request: Request) {
       data: {
         ...parsed.data,
         closeDate: parsed.data.closeDate ? new Date(parsed.data.closeDate) : null,
-        activities: { create: { type: "DEAL_CREATED", description: "Deal created", userId: user.id } }
+        activities: {
+          create: { type: "DEAL_CREATED", description: "Deal created", userId: user.id }
+        }
       }
     });
     return Response.json(deal, { status: 201 });
